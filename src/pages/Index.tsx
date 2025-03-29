@@ -1,12 +1,66 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState, useEffect } from "react";
+import Header from "@/components/Header";
+import Map from "@/components/Map";
+import RouteSearch from "@/components/RouteSearch";
+import SOSButton from "@/components/SOSButton";
+import FeedbackForm from "@/components/FeedbackForm";
+import Auth from "@/components/Auth";
+import { User } from "@/types";
+import { toast } from "sonner";
 
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+  const [activeTab, setActiveTab] = useState<string>("map");
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Simulate checking for existing user
+    const timer = setTimeout(() => {
+      setIsAuthChecking(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser);
+  };
+
+  const handleRouteSearch = (start: string, end: string) => {
+    toast.success("Route found!", {
+      description: `Calculating safest route from ${start} to ${end}`,
+    });
+  };
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-empowerher-primary"></div>
       </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+      
+      <main className="pb-16">
+        {activeTab === "map" && (
+          <>
+            <Map />
+            <RouteSearch onSearch={handleRouteSearch} />
+          </>
+        )}
+        
+        {activeTab === "sos" && <SOSButton />}
+        
+        {activeTab === "reports" && <FeedbackForm />}
+      </main>
     </div>
   );
 };
