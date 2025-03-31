@@ -5,6 +5,8 @@ import { SafetyLevel } from "@/types";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChevronUp, ChevronDown, MapPin, Navigation } from "lucide-react";
 
 // Fixing Leaflet icon issues
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -26,6 +28,7 @@ const Map: React.FC = () => {
   const [showDirections, setShowDirections] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [userMarker, setUserMarker] = useState<L.Marker | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Initialize map
   useEffect(() => {
@@ -151,7 +154,7 @@ const Map: React.FC = () => {
       } else {
         const coords = await geocode(start);
         if (!coords) {
-          alert("Could not find start location");
+          toast.error("Could not find start location");
           return;
         }
         startCoords = coords;
@@ -160,9 +163,15 @@ const Map: React.FC = () => {
       // Get end coordinates
       endCoords = await geocode(end);
       if (!endCoords) {
-        alert("Could not find destination location");
+        toast.error("Could not find destination location");
         return;
       }
+
+      // Set navigation mode
+      setIsNavigating(true);
+      
+      // Show directions panel
+      setShowDirections(true);
 
       // Create routing control
       const control = L.Routing.control({
@@ -255,25 +264,43 @@ const Map: React.FC = () => {
         )}
       </div>
       
-      {/* Directions panel */}
+      {/* Directions panel - Google Maps style */}
       {directions.length > 0 && (
         <>
           <button 
-            className="absolute bottom-4 right-4 px-3 py-2 bg-white rounded-md shadow-md z-10 text-sm flex items-center"
+            className="absolute bottom-4 right-4 px-4 py-2 bg-white rounded-md shadow-md z-10 text-sm flex items-center font-medium"
             onClick={() => setShowDirections(!showDirections)}
           >
-            {showDirections ? '▲ Hide Directions' : '▼ Show Directions'}
+            {showDirections ? (
+              <>
+                <ChevronDown className="w-4 h-4 mr-1" /> Hide Directions
+              </>
+            ) : (
+              <>
+                <ChevronUp className="w-4 h-4 mr-1" /> Show Directions
+              </>
+            )}
           </button>
           
           {showDirections && (
-            <Card className="absolute bottom-16 right-4 w-[300px] max-h-[300px] overflow-auto z-10">
-              <CardContent className="p-3">
-                <h3 className="font-semibold mb-2">Directions</h3>
-                <ul className="space-y-2 text-sm">
-                  {directions.map((step, index) => (
-                    <li key={index} className="border-b border-gray-100 pb-1 last:border-b-0">{step}</li>
-                  ))}
-                </ul>
+            <Card className="absolute bottom-16 right-4 w-[350px] max-h-[50vh] shadow-lg z-10">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-lg">Directions</h3>
+                  <span className="text-xs text-gray-500">{directions.length} steps</span>
+                </div>
+                <ScrollArea className="h-[calc(50vh-100px)]">
+                  <ul className="space-y-3">
+                    {directions.map((step, index) => (
+                      <li key={index} className="flex py-2 border-b border-gray-100 last:border-b-0">
+                        <span className="bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center mr-3 text-xs font-medium flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </ScrollArea>
               </CardContent>
             </Card>
           )}

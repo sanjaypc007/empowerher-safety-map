@@ -1,13 +1,43 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Phone, UserCheck, AlertTriangle } from "lucide-react";
+import { Phone, UserCheck, AlertTriangle, MessageSquare } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { User, EmergencyContact } from "@/types";
 
-const SOSButton: React.FC = () => {
+interface SOSButtonProps {
+  user: User;
+}
+
+const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
   const [isSending, setIsSending] = useState(false);
   const [sentSOS, setSentSOS] = useState(false);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch emergency contacts from Supabase
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('emergency_contacts')
+          .select('*')
+          .eq('user_id', user.id);
+          
+        if (error) throw error;
+        
+        setEmergencyContacts(data || []);
+      } catch (error) {
+        console.error("Error fetching emergency contacts:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchContacts();
+  }, [user.id]);
 
   const handleSOSClick = () => {
     if (sentSOS) return;
@@ -29,6 +59,17 @@ const SOSButton: React.FC = () => {
         setSentSOS(false);
       }, 30000);
     }, 2000);
+  };
+
+  const handleCallContact = (phoneNumber: string) => {
+    // Make a phone call
+    window.location.href = `tel:${phoneNumber}`;
+  };
+  
+  const handleTextContact = (phoneNumber: string) => {
+    // Send a pre-filled SMS
+    const message = "I need help! Please check my location using EmpowerHer app.";
+    window.location.href = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
   };
   
   return (
@@ -73,22 +114,52 @@ const SOSButton: React.FC = () => {
           
           <div className="border-t pt-6">
             <h3 className="font-medium text-center mb-4">Your Emergency Contacts</h3>
-            <div className="space-y-3">
-              <div className="flex items-center p-3 border rounded-lg">
-                <Phone className="w-5 h-5 mr-3 text-empowerher-primary" />
-                <div>
-                  <p className="font-medium">Sarah Johnson</p>
-                  <p className="text-sm text-gray-500">Mother • (555) 123-4567</p>
-                </div>
+            
+            {isLoading ? (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-empowerher-primary"></div>
               </div>
-              <div className="flex items-center p-3 border rounded-lg">
-                <Phone className="w-5 h-5 mr-3 text-empowerher-primary" />
-                <div>
-                  <p className="font-medium">Michael Wilson</p>
-                  <p className="text-sm text-gray-500">Friend • (555) 987-6543</p>
-                </div>
+            ) : emergencyContacts.length > 0 ? (
+              <div className="space-y-3">
+                {emergencyContacts.map((contact) => (
+                  <div key={contact.id} className="flex items-center p-3 border rounded-lg">
+                    <div className="flex-grow">
+                      <p className="font-medium">{contact.name}</p>
+                      <p className="text-sm text-gray-500">{contact.relation} • {contact.phone}</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleCallContact(contact.phone)}
+                      >
+                        <Phone className="h-4 w-4 text-empowerher-primary" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleTextContact(contact.phone)}
+                      >
+                        <MessageSquare className="h-4 w-4 text-empowerher-primary" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-500 mb-4">No emergency contacts added yet</p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => window.location.hash = "/add-contact"}
+                  className="bg-empowerher-primary text-white hover:bg-empowerher-dark"
+                >
+                  Add Emergency Contact
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

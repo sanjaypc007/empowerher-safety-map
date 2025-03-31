@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import { Search, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 
 interface RouteSearchProps {
@@ -38,29 +38,27 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
   };
 
   return (
-    <Card className="absolute top-20 left-0 right-0 mx-4 shadow-lg">
+    <Card className="absolute top-20 left-0 right-0 mx-4 md:mx-auto md:max-w-md shadow-lg z-10">
       <CardContent className="p-4">
         <div className="space-y-4">
-          <div>
-            <label htmlFor="start" className="text-sm font-medium mb-1 block">
-              Starting Point
-            </label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
               id="start"
-              placeholder="Leave empty for current location"
+              placeholder="Starting point (leave empty for current location)"
               value={startLocation}
               onChange={(e) => setStartLocation(e.target.value)}
+              className="pl-10"
             />
           </div>
-          <div>
-            <label htmlFor="destination" className="text-sm font-medium mb-1 block">
-              Destination
-            </label>
+          <div className="relative">
+            <Navigation className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
               id="destination"
               placeholder="Enter destination"
               value={endLocation}
               onChange={(e) => setEndLocation(e.target.value)}
+              className="pl-10"
               required
             />
           </div>
@@ -72,7 +70,7 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
             {isSearching ? (
               <span className="flex items-center">
                 <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                Searching...
+                Finding safest route...
               </span>
             ) : (
               <span className="flex items-center">
