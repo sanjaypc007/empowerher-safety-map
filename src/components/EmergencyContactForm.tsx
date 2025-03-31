@@ -8,6 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { User } from "@/types";
 
+// Define the EmergencyContact interface to match the table structure
+interface EmergencyContact {
+  user_id: string;
+  name: string;
+  phone: string;
+  relation?: string;
+}
+
 interface EmergencyContactFormProps {
   user: User;
   onSubmit: () => void;
@@ -29,27 +37,38 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
     
     setIsSubmitting(true);
     
+    const newContact: EmergencyContact = {
+      user_id: user.id,
+      name,
+      phone,
+      relation: relation || undefined,
+    };
+    
     try {
-      // Store the emergency contact in Supabase
+      // Insert the emergency contact into Supabase
       const { error } = await supabase
-        .from('emergency_contacts')
-        .insert({
-          user_id: user.id,
-          name,
-          phone,
-          relation
-        });
+        .from("emergency_contacts")
+        .insert(newContact);
         
       if (error) throw error;
       
       toast.success("Emergency contact added successfully");
       onSubmit();
-    } catch (error) {
-      console.error("Error saving emergency contact:", error);
+      // Optionally clear fields after successful submission
+      setName("");
+      setPhone("");
+      setRelation("");
+    } catch (err: any) {
+      console.error("Error saving emergency contact:", err);
       toast.error("Failed to save emergency contact");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Function to trigger a call using the tel: protocol
+  const handleCall = () => {
+    window.location.href = `tel:${phone}`;
   };
 
   return (
@@ -80,6 +99,25 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
               type="tel"
               required
             />
+            {phone && (
+              <div className="flex items-center space-x-4 mt-2">
+                {/* Clickable phone number link */}
+                <a 
+                  href={`tel:${phone}`} 
+                  className="text-blue-500 hover:underline"
+                >
+                  {phone}
+                </a>
+                {/* Call button that opens the system dialer */}
+                <Button 
+                  type="button" 
+                  onClick={handleCall}
+                  className="bg-green-500 hover:bg-green-600"
+                >
+                  Call
+                </Button>
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">

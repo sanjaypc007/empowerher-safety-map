@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SafetyLevel } from "@/types";
@@ -7,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChevronUp, ChevronDown, MapPin, Navigation } from "lucide-react";
+import { toast } from "sonner";
 
 // Fixing Leaflet icon issues
 import icon from 'leaflet/dist/images/marker-icon.png';
