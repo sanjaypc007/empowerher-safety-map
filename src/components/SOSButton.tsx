@@ -62,7 +62,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
   };
 
   const handleCallContact = (phoneNumber: string) => {
-    // Make a phone call
+    // Make a phone call using the system dialer
     window.location.href = `tel:${phoneNumber}`;
   };
   
@@ -133,6 +133,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                         size="icon" 
                         className="h-8 w-8"
                         onClick={() => handleCallContact(contact.phone)}
+                        aria-label={`Call ${contact.name}`}
                       >
                         <Phone className="h-4 w-4 text-empowerher-primary" />
                       </Button>
@@ -141,6 +142,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                         size="icon" 
                         className="h-8 w-8"
                         onClick={() => handleTextContact(contact.phone)}
+                        aria-label={`Text ${contact.name}`}
                       >
                         <MessageSquare className="h-4 w-4 text-empowerher-primary" />
                       </Button>
