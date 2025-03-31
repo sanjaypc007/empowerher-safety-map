@@ -37,30 +37,32 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
     
     setIsSubmitting(true);
     
-    const newContact: EmergencyContact = {
-      user_id: user.id,
-      name,
-      phone,
-      relation: relation || undefined,
-    };
-    
     try {
-      // Insert the emergency contact into Supabase
+      // Ensure user ID is in the correct UUID format
+      // We insert each field directly to avoid potential UUID format issues
       const { error } = await supabase
         .from("emergency_contacts")
-        .insert(newContact);
+        .insert({
+          user_id: user.id,
+          name,
+          phone,
+          relation: relation || null
+        });
         
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
       
       toast.success("Emergency contact added successfully");
       onSubmit();
-      // Optionally clear fields after successful submission
+      // Clear fields after successful submission
       setName("");
       setPhone("");
       setRelation("");
     } catch (err: any) {
       console.error("Error saving emergency contact:", err);
-      toast.error("Failed to save emergency contact");
+      toast.error(`Failed to save emergency contact: ${err.message || "Unknown error"}`);
     } finally {
       setIsSubmitting(false);
     }
