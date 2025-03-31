@@ -1,93 +1,285 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { RouteSegment, SafetyLevel } from "@/types";
+import { SafetyLevel } from "@/types";
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 
-// Mock data for safety zones
-const mockSafetyZones = [
-  {
-    id: "1",
-    latitude: 28.6139,
-    longitude: 77.2090,
-    radius: 500,
-    safetyLevel: SafetyLevel.HIGH_RISK,
-  },
-  {
-    id: "2",
-    latitude: 28.6229,
-    longitude: 77.2080,
-    radius: 300,
-    safetyLevel: SafetyLevel.MEDIUM_RISK,
-  },
-  {
-    id: "3",
-    latitude: 28.6339,
-    longitude: 77.2190,
-    radius: 400,
-    safetyLevel: SafetyLevel.SAFE,
-  },
-];
+// Fixing Leaflet icon issues
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// Mock data for route
-const mockRoute: RouteSegment[] = [
-  {
-    id: "1",
-    startLocation: { latitude: 28.6139, longitude: 77.2090, address: "Connaught Place" },
-    endLocation: { latitude: 28.6229, longitude: 77.2080, address: "Janpath" },
-    safetyLevel: SafetyLevel.HIGH_RISK,
-    distance: 1.2,
-  },
-  {
-    id: "2",
-    startLocation: { latitude: 28.6229, longitude: 77.2080, address: "Janpath" },
-    endLocation: { latitude: 28.6339, longitude: 77.2190, address: "India Gate" },
-    safetyLevel: SafetyLevel.MEDIUM_RISK,
-    distance: 2.5,
-  },
-  {
-    id: "3",
-    startLocation: { latitude: 28.6339, longitude: 77.2190, address: "India Gate" },
-    endLocation: { latitude: 28.6129, longitude: 77.2295, address: "Destination" },
-    safetyLevel: SafetyLevel.SAFE,
-    distance: 1.8,
-  },
-];
+// Create safety level colors for the routes
+const safetyColors = {
+  [SafetyLevel.HIGH_RISK]: "#ea384c", // Red for high risk
+  [SafetyLevel.MEDIUM_RISK]: "#f0ad4e", // Yellow/orange for medium risk
+  [SafetyLevel.SAFE]: "#2ecc71", // Green for safe
+};
 
 const Map: React.FC = () => {
+  const mapRef = useRef<HTMLDivElement>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  const [routeControl, setRouteControl] = useState<any>(null);
+  const [directions, setDirections] = useState<string[]>([]);
+  const [showDirections, setShowDirections] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [userMarker, setUserMarker] = useState<L.Marker | null>(null);
 
-  // This would be replaced with actual map initialization in a real app
+  // Initialize map
   useEffect(() => {
-    // Simulate map loading
-    const timer = setTimeout(() => {
-      setIsMapLoaded(true);
-    }, 1000);
+    if (!mapRef.current || mapInstance) return;
 
-    return () => clearTimeout(timer);
+    // Fix default icon issues
+    const defaultIcon = L.icon({
+      iconUrl: icon,
+      shadowUrl: iconShadow,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41]
+    });
+    L.Marker.prototype.options.icon = defaultIcon;
+
+    // Create map
+    const map = L.map(mapRef.current).setView([28.6139, 77.2090], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    setMapInstance(map);
+    setIsMapLoaded(true);
+
+    // Get user's location
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation([latitude, longitude]);
+        map.setView([latitude, longitude], 13);
+        
+        const marker = L.marker([latitude, longitude])
+          .addTo(map)
+          .bindPopup("You are here")
+          .openPopup();
+        
+        setUserMarker(marker);
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+      },
+      { enableHighAccuracy: true }
+    );
+
+    // Watch for position changes
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation([latitude, longitude]);
+        
+        if (userMarker) {
+          userMarker.setLatLng([latitude, longitude]);
+        }
+      },
+      (error) => {
+        console.error("Error watching location:", error);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+
+    // Draw safety zones (placeholder visualization)
+    drawSafetyZones(map);
+
+    return () => {
+      if (map) {
+        map.remove();
+      }
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
+
+  // Function to draw safety zones on the map
+  const drawSafetyZones = (map: L.Map) => {
+    // Example safety zones - these would come from your backend in a real implementation
+    const safetyZones = [
+      { center: [28.6139, 77.2090], radius: 500, level: SafetyLevel.HIGH_RISK },
+      { center: [28.6229, 77.2080], radius: 300, level: SafetyLevel.MEDIUM_RISK },
+      { center: [28.6339, 77.2190], radius: 400, level: SafetyLevel.SAFE },
+    ];
+
+    safetyZones.forEach(zone => {
+      const color = safetyColors[zone.level];
+      L.circle(zone.center, {
+        radius: zone.radius,
+        color,
+        fillColor: color,
+        fillOpacity: 0.3
+      }).addTo(map);
+    });
+  };
+
+  // Calculate route between start and end points
+  const calculateRoute = (start: string, end: string) => {
+    if (!mapInstance) return;
+    
+    // Remove previous route if exists
+    if (routeControl) {
+      mapInstance.removeControl(routeControl);
+    }
+
+    // Helper function for geocoding
+    const geocode = async (query: string): Promise<[number, number] | null> => {
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        if (data && data.length > 0) {
+          return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        }
+        return null;
+      } catch (error) {
+        console.error("Geocoding error:", error);
+        return null;
+      }
+    };
+
+    // Process routing
+    const processRoute = async () => {
+      let startCoords: [number, number];
+      let endCoords: [number, number] | null;
+
+      // Use current location if start is empty
+      if (start === "" && userLocation) {
+        startCoords = userLocation;
+      } else {
+        const coords = await geocode(start);
+        if (!coords) {
+          alert("Could not find start location");
+          return;
+        }
+        startCoords = coords;
+      }
+
+      // Get end coordinates
+      endCoords = await geocode(end);
+      if (!endCoords) {
+        alert("Could not find destination location");
+        return;
+      }
+
+      // Create routing control
+      const control = L.Routing.control({
+        waypoints: [
+          L.latLng(startCoords[0], startCoords[1]),
+          L.latLng(endCoords[0], endCoords[1])
+        ],
+        lineOptions: {
+          styles: [{ color: '#8B5CF6', weight: 5 }], // Default color in empowerher-primary
+          addWaypoints: false, // Prevent waypoint addition on click
+        },
+        show: false, // Don't show the default instructions panel
+        routeWhileDragging: true,
+        fitSelectedRoutes: true,
+      }).addTo(mapInstance);
+
+      // Get directions when route is found
+      control.on('routesfound', function(e: any) {
+        const routes = e.routes;
+        const instructions = routes[0].instructions;
+        setDirections(instructions.map((step: any) => step.text));
+        
+        // In a real app, here you would integrate with your FastAPI
+        // to color the route segments based on safety data
+        // This is placeholder logic for now
+        colorRouteBasedOnSafety(control, routes[0]);
+      });
+
+      setRouteControl(control);
+    };
+
+    processRoute();
+  };
+
+  // Placeholder function for coloring route segments by safety
+  // This is where you'll integrate with your FastAPI
+  const colorRouteBasedOnSafety = (control: any, route: any) => {
+    // Placeholder - in a real app, this would come from your API
+    if (control && route && control._line) {
+      // Example: Split route into segments (this is just a visualization)
+      const routeLength = control._line.getLatLngs().length;
+      const thirdPoint = Math.floor(routeLength / 3);
+      const twoThirdPoint = thirdPoint * 2;
+      
+      // Create new polylines with different colors
+      const coordinates = control._line.getLatLngs();
+      
+      // Remove the original line
+      mapInstance?.removeLayer(control._line);
+      
+      // Add colored segments
+      L.polyline(coordinates.slice(0, thirdPoint), {
+        color: safetyColors[SafetyLevel.HIGH_RISK],
+        weight: 5
+      }).addTo(mapInstance!);
+      
+      L.polyline(coordinates.slice(thirdPoint, twoThirdPoint), {
+        color: safetyColors[SafetyLevel.MEDIUM_RISK],
+        weight: 5
+      }).addTo(mapInstance!);
+      
+      L.polyline(coordinates.slice(twoThirdPoint), {
+        color: safetyColors[SafetyLevel.SAFE],
+        weight: 5
+      }).addTo(mapInstance!);
+    }
+  };
+
+  // Expose the calculateRoute function to the parent component
+  // This will be called from the RouteSearch component
+  React.useEffect(() => {
+    if (window) {
+      (window as any).calculateMapRoute = calculateRoute;
+    }
+    return () => {
+      if (window) {
+        delete (window as any).calculateMapRoute;
+      }
+    };
+  }, [mapInstance, userLocation]);
 
   return (
     <div className="relative w-full h-[calc(100vh-120px)] mt-16">
-      {/* Map placeholder */}
-      <div className="w-full h-full bg-gray-100 relative">
-        {!isMapLoaded ? (
+      {/* Map container */}
+      <div ref={mapRef} className="w-full h-full bg-gray-100 relative">
+        {!isMapLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-empowerher-primary"></div>
           </div>
-        ) : (
-          <>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-gray-500">Interactive Map would be displayed here</p>
-              
-              {/* Safety zones visualization */}
-              <div className="absolute top-1/4 left-1/4 w-24 h-24 rounded-full safety-zone-high"></div>
-              <div className="absolute top-1/3 right-1/3 w-16 h-16 rounded-full safety-zone-medium"></div>
-              <div className="absolute bottom-1/4 right-1/4 w-20 h-20 rounded-full safety-zone-safe"></div>
-            </div>
-          </>
         )}
       </div>
-
+      
+      {/* Directions panel */}
+      {directions.length > 0 && (
+        <>
+          <button 
+            className="absolute bottom-4 right-4 px-3 py-2 bg-white rounded-md shadow-md z-10 text-sm flex items-center"
+            onClick={() => setShowDirections(!showDirections)}
+          >
+            {showDirections ? '▲ Hide Directions' : '▼ Show Directions'}
+          </button>
+          
+          {showDirections && (
+            <Card className="absolute bottom-16 right-4 w-[300px] max-h-[300px] overflow-auto z-10">
+              <CardContent className="p-3">
+                <h3 className="font-semibold mb-2">Directions</h3>
+                <ul className="space-y-2 text-sm">
+                  {directions.map((step, index) => (
+                    <li key={index} className="border-b border-gray-100 pb-1 last:border-b-0">{step}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+      
       {/* Safety legend */}
       <Card className="absolute bottom-4 left-4 w-auto">
         <CardContent className="p-3">

@@ -108,3 +108,14 @@
     @apply bg-empowerher-green bg-opacity-30;
   }
 }
+
+/* Leaflet specific styles */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+}
+
+.leaflet-control-container .leaflet-routing-container {
+  display: none; /* Hide the default routing control */
+}

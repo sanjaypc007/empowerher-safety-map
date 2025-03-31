@@ -28,8 +28,12 @@ const Index = () => {
   };
 
   const handleRouteSearch = (start: string, end: string) => {
-    toast.success("Route found!", {
-      description: `Calculating safest route from ${start} to ${end}`,
+    // This toast will show when the route search is triggered
+    // The actual route calculation is now handled in the Map component
+    toast.success("Finding safest route", {
+      description: start 
+        ? `Calculating route from ${start} to ${end}`
+        : `Calculating route from your location to ${end}`,
     });
   };
 

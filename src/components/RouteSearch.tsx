@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
+import { toast } from "sonner";
 
 interface RouteSearchProps {
   onSearch: (start: string, end: string) => void;
@@ -15,15 +16,25 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
   const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = () => {
-    if (startLocation && endLocation) {
-      setIsSearching(true);
-      
-      // Simulate API call
-      setTimeout(() => {
-        onSearch(startLocation, endLocation);
-        setIsSearching(false);
-      }, 1500);
+    if (!endLocation) {
+      toast.error("Please enter a destination");
+      return;
     }
+    
+    setIsSearching(true);
+
+    // Call the exposed function from Map component
+    if (window && (window as any).calculateMapRoute) {
+      (window as any).calculateMapRoute(startLocation, endLocation);
+    }
+    
+    // Call the provided onSearch callback as well
+    onSearch(startLocation, endLocation);
+    
+    // Reset searching state after a delay to simulate processing
+    setTimeout(() => {
+      setIsSearching(false);
+    }, 1500);
   };
 
   return (
@@ -36,7 +47,7 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
             </label>
             <Input
               id="start"
-              placeholder="Enter starting point"
+              placeholder="Leave empty for current location"
               value={startLocation}
               onChange={(e) => setStartLocation(e.target.value)}
             />
@@ -50,12 +61,13 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
               placeholder="Enter destination"
               value={endLocation}
               onChange={(e) => setEndLocation(e.target.value)}
+              required
             />
           </div>
           <Button 
             className="w-full bg-empowerher-primary hover:bg-empowerher-dark"
             onClick={handleSearch}
-            disabled={!startLocation || !endLocation || isSearching}
+            disabled={!endLocation || isSearching}
           >
             {isSearching ? (
               <span className="flex items-center">
