@@ -17,6 +17,8 @@ const Index = () => {
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [showAddContact, setShowAddContact] = useState<boolean>(false);
   const [hasEmergencyContact, setHasEmergencyContact] = useState<boolean>(false);
+  const [navigationInProgress, setNavigationInProgress] = useState<boolean>(false);
+  const [journeyData, setJourneyData] = useState<{start: string, end: string} | null>(null);
 
   useEffect(() => {
     // Check for existing session
@@ -83,6 +85,22 @@ const Index = () => {
     }
   }, [user]);
 
+  // Set up the navigation completion handler
+  useEffect(() => {
+    // Expose a function to allow the Map component to navigate to reports
+    if (window) {
+      (window as any).navigateToReports = () => {
+        setActiveTab("reports");
+      };
+    }
+    
+    return () => {
+      if (window) {
+        delete (window as any).navigateToReports;
+      }
+    };
+  }, []);
+
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
   };
@@ -99,6 +117,10 @@ const Index = () => {
       });
       return;
     }
+    
+    // Save journey data for feedback form
+    setJourneyData({ start, end });
+    setNavigationInProgress(true);
     
     // This toast will show when the route search is triggered
     toast.success("Finding safest route", {
@@ -162,7 +184,12 @@ const Index = () => {
         
         {activeTab === "sos" && <SOSButton user={user} />}
         
-        {activeTab === "reports" && <FeedbackForm />}
+        {activeTab === "reports" && (
+          <FeedbackForm 
+            initialLocation={journeyData?.start || ""}
+            initialDestination={journeyData?.end || ""}
+          />
+        )}
       </main>
     </div>
   );

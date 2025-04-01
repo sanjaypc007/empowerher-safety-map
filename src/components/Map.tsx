@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SafetyLevel } from "@/types";
@@ -5,7 +6,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChevronUp, ChevronDown, MapPin, Navigation } from "lucide-react";
+import { ChevronUp, ChevronDown, MapPin, Navigation, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 // Fixing Leaflet icon issues
@@ -29,6 +31,7 @@ const Map: React.FC = () => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [userMarker, setUserMarker] = useState<L.Marker | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [navigationComplete, setNavigationComplete] = useState(false);
 
   // Initialize map
   useEffect(() => {
@@ -123,6 +126,8 @@ const Map: React.FC = () => {
   const calculateRoute = (start: string, end: string) => {
     if (!mapInstance) return;
     
+    console.log("Calculating route from", start, "to", end);
+    
     // Remove previous route if exists
     if (routeControl) {
       mapInstance.removeControl(routeControl);
@@ -167,40 +172,49 @@ const Map: React.FC = () => {
         return;
       }
 
+      console.log("Start coordinates:", startCoords);
+      console.log("End coordinates:", endCoords);
+
       // Set navigation mode
       setIsNavigating(true);
+      setNavigationComplete(false);
       
       // Show directions panel
       setShowDirections(true);
 
       // Create routing control
-      const control = L.Routing.control({
-        waypoints: [
-          L.latLng(startCoords[0], startCoords[1]),
-          L.latLng(endCoords[0], endCoords[1])
-        ],
-        lineOptions: {
-          styles: [{ color: '#8B5CF6', weight: 5 }], // Default color in empowerher-primary
-          addWaypoints: false, // Prevent waypoint addition on click
-        },
-        show: false, // Don't show the default instructions panel
-        routeWhileDragging: true,
-        fitSelectedRoutes: true,
-      }).addTo(mapInstance);
+      try {
+        const control = L.Routing.control({
+          waypoints: [
+            L.latLng(startCoords[0], startCoords[1]),
+            L.latLng(endCoords[0], endCoords[1])
+          ],
+          lineOptions: {
+            styles: [{ color: '#8B5CF6', weight: 5 }], // Default color in empowerher-primary
+            addWaypoints: false, // Prevent waypoint addition on click
+          },
+          show: false, // Don't show the default instructions panel
+          routeWhileDragging: true,
+          fitSelectedRoutes: true,
+        }).addTo(mapInstance);
 
-      // Get directions when route is found
-      control.on('routesfound', function(e: any) {
-        const routes = e.routes;
-        const instructions = routes[0].instructions;
-        setDirections(instructions.map((step: any) => step.text));
-        
-        // In a real app, here you would integrate with your FastAPI
-        // to color the route segments based on safety data
-        // This is placeholder logic for now
-        colorRouteBasedOnSafety(control, routes[0]);
-      });
+        // Get directions when route is found
+        control.on('routesfound', function(e: any) {
+          const routes = e.routes;
+          const instructions = routes[0].instructions;
+          setDirections(instructions.map((step: any) => step.text));
+          
+          // In a real app, here you would integrate with your FastAPI
+          // to color the route segments based on safety data
+          // This is placeholder logic for now
+          colorRouteBasedOnSafety(control, routes[0]);
+        });
 
-      setRouteControl(control);
+        setRouteControl(control);
+      } catch (error) {
+        console.error("Error creating route:", error);
+        toast.error("Error creating route. Please try again.");
+      }
     };
 
     processRoute();
@@ -237,6 +251,18 @@ const Map: React.FC = () => {
         color: safetyColors[SafetyLevel.SAFE],
         weight: 5
       }).addTo(mapInstance!);
+    }
+  };
+
+  // Function to handle navigation completion
+  const completeNavigation = () => {
+    setNavigationComplete(true);
+    setIsNavigating(false);
+    toast.success("Navigation completed! Please submit your feedback.");
+    
+    // Notify parent component to switch to reports tab
+    if (window) {
+      (window as any).navigateToReports && (window as any).navigateToReports();
     }
   };
 
@@ -301,6 +327,16 @@ const Map: React.FC = () => {
                     ))}
                   </ul>
                 </ScrollArea>
+                
+                {isNavigating && !navigationComplete && (
+                  <Button 
+                    className="w-full mt-4 bg-empowerher-primary hover:bg-empowerher-dark"
+                    onClick={completeNavigation}
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Complete Navigation
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

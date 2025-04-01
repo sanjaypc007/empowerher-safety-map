@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,11 +16,20 @@ const incidentTypes = [
   { value: "other", label: "Other" },
 ];
 
-const FeedbackForm: React.FC = () => {
+interface FeedbackFormProps {
+  initialLocation?: string;
+  initialDestination?: string;
+}
+
+const FeedbackForm: React.FC<FeedbackFormProps> = ({ 
+  initialLocation = "", 
+  initialDestination = "" 
+}) => {
   const [rating, setRating] = useState<string | null>(null);
   const [incidentType, setIncidentType] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [location, setLocation] = useState<string>("");
+  const [location, setLocation] = useState(initialLocation);
+  const [destination, setDestination] = useState(initialDestination);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -45,6 +53,7 @@ const FeedbackForm: React.FC = () => {
       setIncidentType("");
       setDescription("");
       setLocation("");
+      setDestination("");
       setIsSubmitting(false);
     }, 1500);
   };
@@ -58,12 +67,23 @@ const FeedbackForm: React.FC = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location">Starting Location</Label>
               <Input 
                 id="location" 
-                placeholder="Enter location address"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                value={location} 
+                onChange={(e) => setLocation(e.target.value)} 
+                placeholder="Where did your journey start?"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="destination">Destination</Label>
+              <Input 
+                id="destination" 
+                value={destination} 
+                onChange={(e) => setDestination(e.target.value)} 
+                placeholder="Where did your journey end?"
                 required
               />
             </div>
