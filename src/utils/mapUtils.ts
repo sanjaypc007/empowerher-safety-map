@@ -1,6 +1,8 @@
 
 import L from 'leaflet';
 import { SafetyLevel } from "@/types";
+import iconUrl from 'leaflet/dist/images/marker-icon.png';
+import iconShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 
 // Create safety level colors for the routes
 export const safetyColors = {
@@ -11,12 +13,9 @@ export const safetyColors = {
 
 // Initialize Leaflet icons to fix icon loading issues
 export const initializeLeafletIcons = () => {
-  const icon = require('leaflet/dist/images/marker-icon.png').default;
-  const iconShadow = require('leaflet/dist/images/marker-shadow.png').default;
-  
   const defaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
+    iconUrl,
+    shadowUrl: iconShadowUrl,
     iconSize: [25, 41],
     iconAnchor: [12, 41]
   });
