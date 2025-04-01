@@ -43,6 +43,21 @@ export const drawSafetyZones = (map: L.Map) => {
   });
 };
 
+// Geocode addresses using OpenStreetMap Nominatim
+export const geocodeAddress = async (address: string): Promise<[number, number] | null> => {
+  if (!address) return null;
+  
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+    const data = await response.json();
+    if (data.length === 0) throw new Error("Location not found");
+    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+  } catch (error) {
+    console.error("Geocoding error:", error);
+    throw error;
+  }
+};
+
 // Color route based on safety levels
 export const colorRouteBasedOnSafety = (control: any, route: any, mapInstance: L.Map | null) => {
   if (control && route && control._line && mapInstance) {
@@ -75,17 +90,21 @@ export const colorRouteBasedOnSafety = (control: any, route: any, mapInstance: L
   }
 };
 
-// Geocoding helper function
-export const geocode = async (query: string): Promise<[number, number] | null> => {
-  try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-    const data = await response.json();
-    if (data && data.length > 0) {
-      return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-    }
-    return null;
-  } catch (error) {
-    console.error("Geocoding error:", error);
-    return null;
-  }
+// Function to locate user
+export const locateUser = (map: L.Map) => {
+  map.locate({ setView: true, maxZoom: 16 });
+  
+  map.on('locationfound', (e) => {
+    const marker = L.marker(e.latlng).addTo(map)
+      .bindPopup("Your location")
+      .openPopup();
+    
+    return marker;
+  });
+  
+  map.on('locationerror', (e) => {
+    console.error("Error getting location:", e);
+    throw new Error("Geolocation failed. Please enable location access.");
+  });
 };
+

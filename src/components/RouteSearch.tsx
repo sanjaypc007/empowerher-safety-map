@@ -79,12 +79,12 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
             {isSearching ? (
               <span className="flex items-center">
                 <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                Finding safest route...
+                Finding route...
               </span>
             ) : (
               <span className="flex items-center">
                 <Search className="mr-2 h-4 w-4" />
-                Find Safest Route
+                Get Route
               </span>
             )}
           </Button>

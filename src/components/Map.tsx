@@ -9,7 +9,21 @@ import { toast } from "sonner";
 import DirectionsPanel from "./map/DirectionsPanel";
 import SafetyLegend from "./map/SafetyLegend";
 import { useRouteCalculator } from "./map/RouteCalculator";
-import { initializeLeafletIcons, drawSafetyZones } from "@/utils/mapUtils";
+import { 
+  initializeLeafletIcons, 
+  drawSafetyZones, 
+  locateUser 
+} from "@/utils/mapUtils";
+
+// Add locate button component
+const LocateButton = ({ onClick }: { onClick: () => void }) => (
+  <button 
+    className="fixed top-4 right-4 p-3 bg-white rounded-md shadow-md z-10 flex items-center"
+    onClick={onClick}
+  >
+    <span className="mr-2">📍</span> Locate Me
+  </button>
+);
 
 const Map: React.FC = () => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -42,50 +56,14 @@ const Map: React.FC = () => {
     // Fix default icon issues
     initializeLeafletIcons();
 
-    // Create map
-    const map = L.map(mapRef.current).setView([28.6139, 77.2090], 13);
+    // Create map - using default coordinates from the HTML example
+    const map = L.map(mapRef.current).setView([11.0168, 76.9558], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     setMapInstance(map);
     setIsMapLoaded(true);
-
-    // Get user's location
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation([latitude, longitude]);
-        map.setView([latitude, longitude], 13);
-        
-        const marker = L.marker([latitude, longitude])
-          .addTo(map)
-          .bindPopup("You are here")
-          .openPopup();
-        
-        setUserMarker(marker);
-      },
-      (error) => {
-        console.error("Error getting location:", error);
-      },
-      { enableHighAccuracy: true }
-    );
-
-    // Watch for position changes
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation([latitude, longitude]);
-        
-        if (userMarker) {
-          userMarker.setLatLng([latitude, longitude]);
-        }
-      },
-      (error) => {
-        console.error("Error watching location:", error);
-      },
-      { enableHighAccuracy: true, maximumAge: 10000 }
-    );
 
     // Draw safety zones
     drawSafetyZones(map);
@@ -94,9 +72,44 @@ const Map: React.FC = () => {
       if (map) {
         map.remove();
       }
-      navigator.geolocation.clearWatch(watchId);
     };
   }, []);
+
+  // Handle locate user click
+  const handleLocateUser = () => {
+    if (!mapInstance) return;
+    
+    try {
+      // Remove existing user marker if any
+      if (userMarker) {
+        mapInstance.removeLayer(userMarker);
+        setUserMarker(null);
+      }
+      
+      // Use the locate function from mapUtils
+      mapInstance.locate({ setView: true, maxZoom: 16 });
+      
+      mapInstance.on('locationfound', (e) => {
+        const { lat, lng } = e.latlng;
+        setUserLocation([lat, lng]);
+        
+        const marker = L.marker(e.latlng).addTo(mapInstance)
+          .bindPopup("Your location")
+          .openPopup();
+        
+        setUserMarker(marker);
+        toast.success("Location found");
+      });
+      
+      mapInstance.on('locationerror', (e) => {
+        console.error("Error getting location:", e);
+        toast.error("Failed to get your location. Please enable location access.");
+      });
+    } catch (error) {
+      console.error("Error in locateUser:", error);
+      toast.error("Failed to get your location");
+    }
+  };
 
   // Function to handle navigation completion
   const completeNavigation = () => {
@@ -132,6 +145,9 @@ const Map: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Locate Me button */}
+      <LocateButton onClick={handleLocateUser} />
       
       {/* Directions panel */}
       <DirectionsPanel 
