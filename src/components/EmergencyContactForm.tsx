@@ -38,8 +38,15 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
     setIsSubmitting(true);
     
     try {
+      // Log the data being sent to help debug
+      console.log("Saving emergency contact:", {
+        user_id: user.id,
+        name,
+        phone,
+        relation: relation || null
+      });
+      
       // Ensure user ID is in the correct UUID format
-      // We insert each field directly to avoid potential UUID format issues
       const { error } = await supabase
         .from("emergency_contacts")
         .insert({

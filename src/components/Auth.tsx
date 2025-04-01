@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { User } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AuthProps {
   onLogin: (user: User) => void;
@@ -19,7 +20,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [name, setName] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       toast.error("Please fill all required fields");
@@ -28,21 +29,34 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     
     setIsLoading(true);
     
-    // Simulate login
-    setTimeout(() => {
-      const mockUser: User = {
-        id: "user-123",
-        email: email,
-        name: "Jane Doe",
-      };
+    try {
+      // Use Supabase auth to sign in
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       
-      onLogin(mockUser);
-      toast.success("Successfully logged in");
+      if (error) throw error;
+      
+      if (data && data.user) {
+        const mockUser: User = {
+          id: data.user.id,
+          email: data.user.email || email,
+          name: data.user.user_metadata.name || "User",
+        };
+        
+        onLogin(mockUser);
+        toast.success("Successfully logged in");
+      }
+    } catch (error: any) {
+      console.error("Login error:", error);
+      toast.error(error.message || "Failed to login");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) {
       toast.error("Please fill all required fields");
@@ -51,18 +65,36 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     
     setIsLoading(true);
     
-    // Simulate signup
-    setTimeout(() => {
-      const mockUser: User = {
-        id: "user-new",
-        email: email,
-        name: name,
-      };
+    try {
+      // Use Supabase auth to sign up
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+          },
+        },
+      });
       
-      onLogin(mockUser);
-      toast.success("Account created successfully");
+      if (error) throw error;
+      
+      if (data && data.user) {
+        const mockUser: User = {
+          id: data.user.id,
+          email: data.user.email || email,
+          name: name,
+        };
+        
+        onLogin(mockUser);
+        toast.success("Account created successfully");
+      }
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      toast.error(error.message || "Failed to create account");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

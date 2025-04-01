@@ -19,12 +19,45 @@ const Index = () => {
   const [hasEmergencyContact, setHasEmergencyContact] = useState<boolean>(false);
 
   useEffect(() => {
-    // Simulate checking for existing user
-    const timer = setTimeout(() => {
-      setIsAuthChecking(false);
-    }, 1000);
+    // Check for existing session
+    const checkUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email || "",
+            name: session.user.user_metadata?.name || "User",
+          });
+        }
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
     
-    return () => clearTimeout(timer);
+    checkUser();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email || "",
+            name: session.user.user_metadata?.name || "User",
+          });
+        } else {
+          setUser(null);
+        }
+      }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -56,7 +89,7 @@ const Index = () => {
 
   const handleRouteSearch = (start: string, end: string) => {
     // Check if user has emergency contacts before navigation
-    if (!hasEmergencyContact && activeTab === "map") {
+    if (!hasEmergencyContact && user) {
       toast.info("Please add an emergency contact first", {
         description: "For your safety, we recommend adding at least one emergency contact",
         action: {
@@ -68,7 +101,6 @@ const Index = () => {
     }
     
     // This toast will show when the route search is triggered
-    // The actual route calculation is now handled in the Map component
     toast.success("Finding safest route", {
       description: start 
         ? `Calculating route from ${start} to ${end}`
@@ -103,6 +135,14 @@ const Index = () => {
             user={user} 
             onSubmit={handleContactAdded} 
           />
+          <div className="mt-4 text-center">
+            <button 
+              onClick={() => setShowAddContact(false)}
+              className="text-empowerher-primary hover:underline"
+            >
+              Go back
+            </button>
+          </div>
         </div>
       </div>
     );
