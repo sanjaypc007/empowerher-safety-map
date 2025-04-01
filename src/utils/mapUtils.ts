@@ -1,8 +1,6 @@
 
 import L from 'leaflet';
 import { SafetyLevel } from "@/types";
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import iconShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 
 // Create safety level colors for the routes
 export const safetyColors = {
@@ -13,9 +11,13 @@ export const safetyColors = {
 
 // Initialize Leaflet icons to fix icon loading issues
 export const initializeLeafletIcons = () => {
+  // Set default icon path for Leaflet
+  const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+  const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
+  
   const defaultIcon = L.icon({
     iconUrl,
-    shadowUrl: iconShadowUrl,
+    shadowUrl,
     iconSize: [25, 41],
     iconAnchor: [12, 41]
   });
@@ -27,9 +29,9 @@ export const initializeLeafletIcons = () => {
 export const drawSafetyZones = (map: L.Map) => {
   // Example safety zones - these would come from your backend in a real implementation
   const safetyZones = [
-    { center: [28.6139, 77.2090], radius: 500, level: SafetyLevel.HIGH_RISK },
-    { center: [28.6229, 77.2080], radius: 300, level: SafetyLevel.MEDIUM_RISK },
-    { center: [28.6339, 77.2190], radius: 400, level: SafetyLevel.SAFE },
+    { center: [11.0168, 76.9558], radius: 500, level: SafetyLevel.HIGH_RISK },
+    { center: [11.0268, 76.9658], radius: 300, level: SafetyLevel.MEDIUM_RISK },
+    { center: [11.0368, 76.9758], radius: 400, level: SafetyLevel.SAFE },
   ];
 
   safetyZones.forEach(zone => {
@@ -60,17 +62,25 @@ export const geocodeAddress = async (address: string): Promise<[number, number] 
 
 // Color route based on safety levels
 export const colorRouteBasedOnSafety = (control: any, route: any, mapInstance: L.Map | null) => {
-  if (control && route && control._line && mapInstance) {
-    // Placeholder - in a real app, this would come from your API
-    const routeLength = control._line.getLatLngs().length;
+  if (!control || !route || !mapInstance) return;
+  
+  try {
+    // Get the route coordinates
+    const coordinates = control._line?.getLatLngs();
+    if (!coordinates || coordinates.length === 0) {
+      console.error("No route coordinates found");
+      return;
+    }
+    
+    // Remove the original line if it exists
+    if (control._line) {
+      mapInstance.removeLayer(control._line);
+    }
+    
+    // Divide the route into three segments to color differently
+    const routeLength = coordinates.length;
     const thirdPoint = Math.floor(routeLength / 3);
     const twoThirdPoint = thirdPoint * 2;
-    
-    // Create new polylines with different colors
-    const coordinates = control._line.getLatLngs();
-    
-    // Remove the original line
-    mapInstance.removeLayer(control._line);
     
     // Add colored segments
     L.polyline(coordinates.slice(0, thirdPoint), {
@@ -87,17 +97,23 @@ export const colorRouteBasedOnSafety = (control: any, route: any, mapInstance: L
       color: safetyColors[SafetyLevel.SAFE],
       weight: 5
     }).addTo(mapInstance);
+  } catch (error) {
+    console.error("Error coloring route:", error);
   }
 };
 
 // Function to locate user
-export const locateUser = (map: L.Map) => {
+export const locateUser = (map: L.Map, callback?: (location: [number, number]) => void) => {
   map.locate({ setView: true, maxZoom: 16 });
   
   map.on('locationfound', (e) => {
     const marker = L.marker(e.latlng).addTo(map)
       .bindPopup("Your location")
       .openPopup();
+    
+    if (callback) {
+      callback([e.latlng.lat, e.latlng.lng]);
+    }
     
     return marker;
   });
@@ -107,4 +123,3 @@ export const locateUser = (map: L.Map) => {
     throw new Error("Geolocation failed. Please enable location access.");
   });
 };
-

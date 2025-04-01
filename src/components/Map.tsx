@@ -11,8 +11,7 @@ import SafetyLegend from "./map/SafetyLegend";
 import { useRouteCalculator } from "./map/RouteCalculator";
 import { 
   initializeLeafletIcons, 
-  drawSafetyZones, 
-  locateUser 
+  drawSafetyZones
 } from "@/utils/mapUtils";
 
 // Add locate button component
@@ -27,22 +26,22 @@ const LocateButton = ({ onClick }: { onClick: () => void }) => (
 
 const Map: React.FC = () => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
-  const [routeControl, setRouteControl] = useState<any>(null);
+  const [routingControl, setRoutingControl] = useState<any>(null);
   const [directions, setDirections] = useState<string[]>([]);
   const [showDirections, setShowDirections] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [userMarker, setUserMarker] = useState<L.Marker | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationComplete, setNavigationComplete] = useState(false);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   // Use our route calculator hook
   const { calculateRoute } = useRouteCalculator({
     mapInstance,
     userLocation,
-    setRoutingControl: setRouteControl,
-    routingControl: routeControl,
+    setRoutingControl,
+    routingControl,
     setDirections,
     setIsNavigating,
     setNavigationComplete,
@@ -56,7 +55,7 @@ const Map: React.FC = () => {
     // Fix default icon issues
     initializeLeafletIcons();
 
-    // Create map - using default coordinates from the HTML example
+    // Create map - using default coordinates 
     const map = L.map(mapRef.current).setView([11.0168, 76.9558], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -86,7 +85,6 @@ const Map: React.FC = () => {
         setUserMarker(null);
       }
       
-      // Use the locate function from mapUtils
       mapInstance.locate({ setView: true, maxZoom: 16 });
       
       mapInstance.on('locationfound', (e) => {

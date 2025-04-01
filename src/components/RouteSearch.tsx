@@ -35,14 +35,15 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
       
       // Call the provided onSearch callback as well
       onSearch(startLocation, endLocation);
-    } catch (error) {
-      console.error("Error calculating route:", error);
-      toast.error("Error calculating route. Please try again.");
-    } finally {
+      
       // Reset searching state after a delay to simulate processing
       setTimeout(() => {
         setIsSearching(false);
       }, 1500);
+    } catch (error) {
+      console.error("Error calculating route:", error);
+      toast.error("Error calculating route. Please try again.");
+      setIsSearching(false);
     }
   };
 
