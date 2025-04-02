@@ -46,16 +46,42 @@ export const drawSafetyZones = (map: L.Map) => {
 };
 
 // Geocode addresses using OpenStreetMap Nominatim
-export const geocodeAddress = async (address: string): Promise<[number, number] | null> => {
+export const geocodeAddress = async (address: string): Promise<L.LatLng | null> => {
   if (!address) return null;
   
   try {
     const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
     const data = await response.json();
     if (data.length === 0) throw new Error("Location not found");
-    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+    return L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
   } catch (error) {
     console.error("Geocoding error:", error);
+    throw error;
+  }
+};
+
+// Calculate route between two points
+export const calculateRoute = (map: L.Map, startCoords: L.LatLng, endCoords: L.LatLng) => {
+  try {
+    // Create the routing control using OSRM service
+    const control = L.Routing.control({
+      waypoints: [
+        startCoords,
+        endCoords
+      ],
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1'
+      }),
+      lineOptions: {
+        styles: [{ color: '#007bff', weight: 5 }],
+        addWaypoints: false,
+      },
+      show: false, // Don't show the default instructions panel
+    }).addTo(map);
+    
+    return control;
+  } catch (error) {
+    console.error("Error calculating route:", error);
     throw error;
   }
 };

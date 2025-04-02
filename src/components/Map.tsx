@@ -9,22 +9,7 @@ import { toast } from "sonner";
 import DirectionsPanel from "./map/DirectionsPanel";
 import SafetyLegend from "./map/SafetyLegend";
 import RouteSearch from "./RouteSearch";
-
-// Initialize Leaflet icons to fix icon loading issues
-const initializeLeafletIcons = () => {
-  // Set default icon path for Leaflet
-  const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
-  const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
-  
-  const defaultIcon = L.icon({
-    iconUrl,
-    shadowUrl,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
-  });
-  
-  L.Marker.prototype.options.icon = defaultIcon;
-};
+import { initializeLeafletIcons, drawSafetyZones, geocodeAddress } from "@/utils/mapUtils";
 
 // Add locate button component
 const LocateButton = ({ onClick }: { onClick: () => void }) => (
@@ -35,13 +20,6 @@ const LocateButton = ({ onClick }: { onClick: () => void }) => (
     <span className="mr-2">📍</span> Locate Me
   </button>
 );
-
-// Safety zone colors
-const safetyColors = {
-  "HIGH_RISK": "#ea384c", // Red for high risk
-  "MEDIUM_RISK": "#f0ad4e", // Yellow/orange for medium risk
-  "SAFE": "#2ecc71", // Green for safe
-};
 
 const Map: React.FC = () => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -79,41 +57,6 @@ const Map: React.FC = () => {
       }
     };
   }, []);
-
-  // Draw safety zones on the map
-  const drawSafetyZones = (map: L.Map) => {
-    // Example safety zones - these would come from your backend in a real implementation
-    const safetyZones = [
-      { center: [11.0168, 76.9558], radius: 500, level: "HIGH_RISK" },
-      { center: [11.0268, 76.9658], radius: 300, level: "MEDIUM_RISK" },
-      { center: [11.0368, 76.9758], radius: 400, level: "SAFE" },
-    ];
-
-    safetyZones.forEach(zone => {
-      const color = safetyColors[zone.level as keyof typeof safetyColors];
-      L.circle(zone.center as L.LatLngExpression, {
-        radius: zone.radius,
-        color,
-        fillColor: color,
-        fillOpacity: 0.3
-      }).addTo(map);
-    });
-  };
-
-  // Geocode addresses using OpenStreetMap Nominatim
-  const geocodeAddress = async (address: string): Promise<L.LatLng | null> => {
-    if (!address) return null;
-    
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-      const data = await response.json();
-      if (data.length === 0) throw new Error("Location not found");
-      return L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
-    } catch (error) {
-      console.error("Geocoding error:", error);
-      throw error;
-    }
-  };
 
   // Calculate route function
   const calculateRoute = async (start: string, end: string) => {
@@ -255,7 +198,7 @@ const Map: React.FC = () => {
         delete (window as any).calculateMapRoute;
       }
     };
-  }, [calculateRoute]);
+  }, [mapInstance]);
 
   return (
     <div className="relative w-full h-[calc(100vh-120px)] mt-16">
