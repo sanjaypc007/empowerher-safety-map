@@ -1,18 +1,30 @@
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { toast } from "sonner";
 
-// Import smaller components and utilities
+// Import smaller components
 import DirectionsPanel from "./map/DirectionsPanel";
 import SafetyLegend from "./map/SafetyLegend";
-import { useRouteCalculator } from "./map/RouteCalculator";
-import { 
-  initializeLeafletIcons, 
-  drawSafetyZones
-} from "@/utils/mapUtils";
+import RouteSearch from "./RouteSearch";
+
+// Initialize Leaflet icons to fix icon loading issues
+const initializeLeafletIcons = () => {
+  // Set default icon path for Leaflet
+  const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+  const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
+  
+  const defaultIcon = L.icon({
+    iconUrl,
+    shadowUrl,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+  });
+  
+  L.Marker.prototype.options.icon = defaultIcon;
+};
 
 // Add locate button component
 const LocateButton = ({ onClick }: { onClick: () => void }) => (
@@ -24,6 +36,13 @@ const LocateButton = ({ onClick }: { onClick: () => void }) => (
   </button>
 );
 
+// Safety zone colors
+const safetyColors = {
+  "HIGH_RISK": "#ea384c", // Red for high risk
+  "MEDIUM_RISK": "#f0ad4e", // Yellow/orange for medium risk
+  "SAFE": "#2ecc71", // Green for safe
+};
+
 const Map: React.FC = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
@@ -31,22 +50,9 @@ const Map: React.FC = () => {
   const [directions, setDirections] = useState<string[]>([]);
   const [showDirections, setShowDirections] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [userMarker, setUserMarker] = useState<L.Marker | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationComplete, setNavigationComplete] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-
-  // Use our route calculator hook
-  const { calculateRoute } = useRouteCalculator({
-    mapInstance,
-    userLocation,
-    setRoutingControl,
-    routingControl,
-    setDirections,
-    setIsNavigating,
-    setNavigationComplete,
-    setShowDirections
-  });
 
   // Initialize map
   useEffect(() => {
@@ -74,28 +80,146 @@ const Map: React.FC = () => {
     };
   }, []);
 
+  // Draw safety zones on the map
+  const drawSafetyZones = (map: L.Map) => {
+    // Example safety zones - these would come from your backend in a real implementation
+    const safetyZones = [
+      { center: [11.0168, 76.9558], radius: 500, level: "HIGH_RISK" },
+      { center: [11.0268, 76.9658], radius: 300, level: "MEDIUM_RISK" },
+      { center: [11.0368, 76.9758], radius: 400, level: "SAFE" },
+    ];
+
+    safetyZones.forEach(zone => {
+      const color = safetyColors[zone.level as keyof typeof safetyColors];
+      L.circle(zone.center as L.LatLngExpression, {
+        radius: zone.radius,
+        color,
+        fillColor: color,
+        fillOpacity: 0.3
+      }).addTo(map);
+    });
+  };
+
+  // Geocode addresses using OpenStreetMap Nominatim
+  const geocodeAddress = async (address: string): Promise<L.LatLng | null> => {
+    if (!address) return null;
+    
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+      const data = await response.json();
+      if (data.length === 0) throw new Error("Location not found");
+      return L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      throw error;
+    }
+  };
+
+  // Calculate route function
+  const calculateRoute = async (start: string, end: string) => {
+    if (!mapInstance) {
+      toast.error("Map not initialized");
+      return;
+    }
+    
+    console.log("Calculating route from", start, "to", end);
+    
+    try {
+      // Remove previous route if exists
+      if (routingControl) {
+        mapInstance.removeControl(routingControl);
+        setRoutingControl(null);
+      }
+      
+      // Get start coordinates (use current location if start is empty)
+      let startCoords: L.LatLng;
+      if (start === "") {
+        if (userLocation) {
+          startCoords = L.latLng(userLocation[0], userLocation[1]);
+        } else {
+          // Get current location if not already available
+          startCoords = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              (position) => resolve(L.latLng(position.coords.latitude, position.coords.longitude)),
+              (error) => reject("Geolocation failed. Please enable location access.")
+            );
+          });
+        }
+      } else {
+        const coords = await geocodeAddress(start);
+        if (!coords) {
+          toast.error("Could not find start location");
+          return;
+        }
+        startCoords = coords;
+      }
+
+      // Get end coordinates
+      const endCoords = await geocodeAddress(end);
+      if (!endCoords) {
+        toast.error("Could not find destination location");
+        return;
+      }
+
+      console.log("Start coordinates:", startCoords);
+      console.log("End coordinates:", endCoords);
+
+      // Set navigation mode
+      setIsNavigating(true);
+      setNavigationComplete(false);
+      
+      // Show directions panel
+      setShowDirections(true);
+
+      // Create routing control using OSRM service
+      const control = L.Routing.control({
+        waypoints: [
+          startCoords,
+          endCoords
+        ],
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1'
+        }),
+        lineOptions: {
+          styles: [{ color: '#007bff', weight: 5 }],
+          addWaypoints: false,
+        },
+        show: false, // Don't show the default instructions panel
+      }).addTo(mapInstance);
+
+      // Get directions when route is found
+      control.on('routesfound', function(e: any) {
+        console.log("Route found:", e);
+        const routes = e.routes;
+        if (routes && routes.length > 0) {
+          const instructions = routes[0].instructions;
+          setDirections(instructions.map((step: any) => step.text));
+        }
+      });
+
+      setRoutingControl(control);
+    } catch (error) {
+      console.error("Error calculating route:", error);
+      toast.error(error instanceof Error ? error.message : "Error calculating route");
+    }
+  };
+
   // Handle locate user click
   const handleLocateUser = () => {
     if (!mapInstance) return;
     
     try {
-      // Remove existing user marker if any
-      if (userMarker) {
-        mapInstance.removeLayer(userMarker);
-        setUserMarker(null);
-      }
-      
       mapInstance.locate({ setView: true, maxZoom: 16 });
       
       mapInstance.on('locationfound', (e) => {
         const { lat, lng } = e.latlng;
         setUserLocation([lat, lng]);
         
-        const marker = L.marker(e.latlng).addTo(mapInstance)
+        // Add marker at user's location
+        L.marker(e.latlng).addTo(mapInstance)
           .bindPopup("Your location")
           .openPopup();
         
-        setUserMarker(marker);
         toast.success("Location found");
       });
       
