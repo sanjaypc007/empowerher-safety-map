@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import L from 'leaflet';
 import axios from 'axios';
@@ -84,8 +83,8 @@ const Map: React.FC = () => {
     // Create map with a short delay to ensure DOM is ready
     const timer = setTimeout(() => {
       try {
-        // Create map - starting with a default location, but we'll update to user's location
-        const map = L.map(mapRef.current).setView([11.0168, 76.9558], 14);
+        // Create map with a temporary default location (will be overridden when we get user location)
+        const map = L.map(mapRef.current).setView([0, 0], 2); // Start with world view
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -93,37 +92,53 @@ const Map: React.FC = () => {
         setMapInstance(map);
         setIsMapLoaded(true);
         
-        // Ensure map is fully initialized before drawing safety zones
+        // Ensure map is fully initialized before drawing safety zones and tracking
         map.whenReady(() => {
           try {
-            setTimeout(() => {
-              drawSafetyZones(map);
-              
-              // Start tracking user location once map is ready - automatically show current location
-              const tracker = trackUserLocation(map);
-              setLocationTracker(tracker);
-              tracker.startTracking();
-              
-              // Store location data when available
+            // Draw safety zones first
+            drawSafetyZones(map);
+            
+            // Add a message to indicate we're getting location
+            toast.info("Getting your location...");
+            
+            // Start tracking user location with more aggressive settings
+            const tracker = trackUserLocation(map);
+            setLocationTracker(tracker);
+            tracker.startTracking();
+            
+            // Request location with max accuracy
+            if (navigator.geolocation) {
               navigator.geolocation.getCurrentPosition(
                 (position) => {
-                  setUserLocation([position.coords.latitude, position.coords.longitude]);
+                  const { latitude, longitude } = position.coords;
+                  
+                  // Store location and center map on it
+                  setUserLocation([latitude, longitude]);
+                  map.setView([latitude, longitude], 16);
+                  console.log("Initial position set:", latitude, longitude);
+                  
+                  toast.success("Location found");
                 },
                 (error) => {
-                  console.error("Error getting location:", error);
-                  toast.error("Could not get your location. Please enable location access.");
+                  console.error("Geolocation error:", error);
+                  toast.error("Could not get your precise location. Please ensure you've granted location permissions.");
+                },
+                { 
+                  enableHighAccuracy: true,
+                  timeout: 10000,
+                  maximumAge: 0
                 }
               );
-            }, 200); // Add a short delay to ensure map is fully ready
+            }
           } catch (error) {
-            console.error("Error drawing safety zones:", error);
+            console.error("Error in map initialization:", error);
           }
         });
       } catch (error) {
         console.error("Error initializing map:", error);
         toast.error("Failed to initialize map. Please refresh the page.");
       }
-    }, 200); // Increased delay for more reliable initialization
+    }, 200);
 
     return () => {
       clearTimeout(timer);
@@ -336,22 +351,42 @@ const Map: React.FC = () => {
     }
   };
 
-  // Handle locate user click (center map on current location)
+  // Handle locate user click (center map on current location with improved accuracy)
   const handleLocateUser = () => {
     if (!mapInstance) return;
     
     try {
-      mapInstance.locate({ setView: true, maxZoom: 16 });
+      toast.info("Finding your precise location...");
+      
+      // Clear previous location tracking
+      if (locationTracker) {
+        locationTracker.stopTracking();
+      }
+      
+      // Start fresh tracking with maximum accuracy
+      const tracker = trackUserLocation(mapInstance);
+      setLocationTracker(tracker);
+      tracker.startTracking();
+      
+      // Also use the map's built-in locate method as a backup
+      mapInstance.locate({ 
+        setView: true, 
+        maxZoom: 16,
+        enableHighAccuracy: true,
+        watch: true,
+        timeout: 10000
+      });
       
       mapInstance.on('locationfound', (e) => {
         const { lat, lng } = e.latlng;
         setUserLocation([lat, lng]);
+        console.log("User located at:", lat, lng);
         toast.success("Location found");
       });
       
       mapInstance.on('locationerror', (e) => {
         console.error("Error getting location:", e);
-        toast.error("Failed to get your location. Please enable location access.");
+        toast.error("Failed to get your location. Please ensure location services are enabled.");
       });
     } catch (error) {
       console.error("Error in locateUser:", error);

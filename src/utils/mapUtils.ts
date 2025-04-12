@@ -58,42 +58,36 @@ export const trackUserLocation = (map: L.Map): {
     try {
       const { latitude, longitude, accuracy } = position.coords;
       const latlng = L.latLng(latitude, longitude);
+      
+      // Clear existing markers/circles to prevent duplicates
+      if (locationMarker) map.removeLayer(locationMarker);
+      if (accuracyCircle) map.removeLayer(accuracyCircle);
+      
+      // Create custom icon for user location
+      const userIcon = L.divIcon({
+        className: 'user-location-marker',
+        html: '<div class="pulse"></div>',
+        iconSize: [15, 15],
+        iconAnchor: [7, 7]
+      });
+      
+      // Always create a new marker to ensure it reflects the latest position
+      locationMarker = L.marker(latlng, { icon: userIcon }).addTo(map);
+      locationMarker.bindPopup("Your current location").openPopup();
 
-      // Center the map on the user's location when first detected
-      if (!locationMarker) {
-        map.setView(latlng, 16);
-      }
-
-      // Update or create the marker
-      if (locationMarker) {
-        locationMarker.setLatLng(latlng);
-      } else {
-        // Create custom icon for user location
-        const userIcon = L.divIcon({
-          className: 'user-location-marker',
-          html: '<div class="pulse"></div>',
-          iconSize: [15, 15],
-          iconAnchor: [7, 7]
-        });
-        
-        locationMarker = L.marker(latlng, { icon: userIcon }).addTo(map);
-        locationMarker.bindPopup("Your current location").openPopup();
-      }
-
-      // Update or create accuracy circle with reduced size and opacity
-      if (accuracyCircle) {
-        accuracyCircle.setLatLng(latlng);
-        // Use a smaller radius by dividing the actual accuracy by 2 or using a fixed smaller value
-        accuracyCircle.setRadius(Math.min(accuracy / 2, 50)); // Reduced radius, max 50 meters
-      } else {
-        accuracyCircle = L.circle(latlng, {
-          radius: Math.min(accuracy / 2, 50), // Reduced radius, max 50 meters
-          color: '#4A90E2',
-          fillColor: '#4A90E2',
-          fillOpacity: 0.08, // Reduced opacity
-          weight: 1
-        }).addTo(map);
-      }
+      // Use a much smaller, less obtrusive accuracy circle
+      accuracyCircle = L.circle(latlng, {
+        radius: Math.min(accuracy / 4, 30), // Even smaller radius, max 30 meters
+        color: '#4A90E2',
+        fillColor: '#4A90E2',
+        fillOpacity: 0.05, // Further reduced opacity
+        weight: 1
+      }).addTo(map);
+      
+      // Center the map on the user's location when first detected or on significant position changes
+      map.setView(latlng, 16);
+      
+      console.log("Location updated:", latitude, longitude);
     } catch (error) {
       console.error("Error updating location marker:", error);
     }
@@ -105,19 +99,32 @@ export const trackUserLocation = (map: L.Map): {
 
   const startTracking = () => {
     if ("geolocation" in navigator) {
-      // Get initial position with high accuracy
-      navigator.geolocation.getCurrentPosition(updateLocation, handleError, {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0
-      });
+      // Clear the existing watch if any
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
       
-      // Start watching position with more frequent updates
-      watchId = navigator.geolocation.watchPosition(updateLocation, handleError, {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0
-      });
+      // Force a clear cache request for more accurate initial position
+      navigator.geolocation.getCurrentPosition(
+        updateLocation, 
+        handleError, 
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0 // Force fresh location, don't use cached
+        }
+      );
+      
+      // Set a more aggressive watch with very frequent updates
+      watchId = navigator.geolocation.watchPosition(
+        updateLocation, 
+        handleError, 
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0 // Never use cached positions
+        }
+      );
     }
   };
 
