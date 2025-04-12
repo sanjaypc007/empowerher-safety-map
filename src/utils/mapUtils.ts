@@ -25,26 +25,6 @@ export const initializeLeafletIcons = () => {
   L.Marker.prototype.options.icon = defaultIcon;
 };
 
-// Draw safety zones on the map
-export const drawSafetyZones = (map: L.Map) => {
-  // Example safety zones - these would come from your backend in a real implementation
-  const safetyZones = [
-    { center: [11.0168, 76.9558], radius: 500, level: SafetyLevel.HIGH_RISK },
-    { center: [11.0268, 76.9658], radius: 300, level: SafetyLevel.MEDIUM_RISK },
-    { center: [11.0368, 76.9758], radius: 400, level: SafetyLevel.SAFE },
-  ];
-
-  safetyZones.forEach(zone => {
-    const color = safetyColors[zone.level];
-    L.circle(zone.center as L.LatLngExpression, {
-      radius: zone.radius,
-      color,
-      fillColor: color,
-      fillOpacity: 0.3
-    }).addTo(map);
-  });
-};
-
 // Geocode addresses using OpenStreetMap Nominatim
 export const geocodeAddress = async (address: string): Promise<L.LatLng | null> => {
   if (!address) return null;
@@ -60,7 +40,7 @@ export const geocodeAddress = async (address: string): Promise<L.LatLng | null> 
   }
 };
 
-// Calculate route between two points
+// Calculate route between two points using Leaflet Routing Machine
 export const calculateRoute = (map: L.Map, startCoords: L.LatLng, endCoords: L.LatLng) => {
   try {
     // Create the routing control using OSRM service

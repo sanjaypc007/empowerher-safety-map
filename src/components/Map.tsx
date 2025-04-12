@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import DirectionsPanel from "./map/DirectionsPanel";
 import SafetyLegend from "./map/SafetyLegend";
 import RouteSearch from "./RouteSearch";
-import { initializeLeafletIcons, drawSafetyZones, geocodeAddress } from "@/utils/mapUtils";
+import { initializeLeafletIcons, safetyColors, SafetyLevel } from "@/utils/mapUtils";
 
 // Add locate button component
 const LocateButton = ({ onClick }: { onClick: () => void }) => (
@@ -40,25 +40,79 @@ const Map: React.FC = () => {
 
     // Fix default icon issues
     initializeLeafletIcons();
+    
+    // Create map with a short delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      try {
+        // Create map - using default coordinates 
+        const map = L.map(mapRef.current).setView([11.0168, 76.9558], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
 
-    // Create map - using default coordinates 
-    const map = L.map(mapRef.current).setView([11.0168, 76.9558], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-
-    setMapInstance(map);
-    setIsMapLoaded(true);
-
-    // Draw safety zones
-    drawSafetyZones(map);
+        setMapInstance(map);
+        setIsMapLoaded(true);
+        
+        // Draw safety zones safely after map is fully initialized
+        map.whenReady(() => {
+          try {
+            drawSafetyZones(map);
+          } catch (error) {
+            console.error("Error drawing safety zones:", error);
+          }
+        });
+      } catch (error) {
+        console.error("Error initializing map:", error);
+        toast.error("Failed to initialize map. Please refresh the page.");
+      }
+    }, 100);
 
     return () => {
-      if (map) {
-        map.remove();
+      clearTimeout(timer);
+      if (mapInstance) {
+        mapInstance.remove();
       }
     };
   }, []);
+
+  // Draw safety zones on the map
+  const drawSafetyZones = (map: L.Map) => {
+    // Example safety zones - these would come from your backend in a real implementation
+    const safetyZones = [
+      { center: [11.0168, 76.9558], radius: 500, level: SafetyLevel.HIGH_RISK },
+      { center: [11.0268, 76.9658], radius: 300, level: SafetyLevel.MEDIUM_RISK },
+      { center: [11.0368, 76.9758], radius: 400, level: SafetyLevel.SAFE },
+    ];
+
+    safetyZones.forEach(zone => {
+      try {
+        const color = safetyColors[zone.level];
+        L.circle(zone.center as L.LatLngExpression, {
+          radius: zone.radius,
+          color,
+          fillColor: color,
+          fillOpacity: 0.3
+        }).addTo(map);
+      } catch (error) {
+        console.error("Error adding safety zone:", error);
+      }
+    });
+  };
+
+  // Geocode addresses using OpenStreetMap Nominatim
+  const geocodeAddress = async (address: string): Promise<L.LatLng | null> => {
+    if (!address) return null;
+    
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+      const data = await response.json();
+      if (data.length === 0) throw new Error("Location not found");
+      return L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      throw error;
+    }
+  };
 
   // Generate directions from OSRM response
   const generateDirections = (route: any): string[] => {
@@ -172,32 +226,38 @@ const Map: React.FC = () => {
         // Fallback to Leaflet Routing Machine if OSRM direct API fails
         toast.info("Using fallback routing service...");
         
-        const control = L.Routing.control({
-          waypoints: [
-            startCoords,
-            endCoords
-          ],
-          router: L.Routing.osrmv1({
-            serviceUrl: 'https://router.project-osrm.org/route/v1'
-          }),
-          lineOptions: {
-            styles: [{ color: '#007bff', weight: 5 }],
-            addWaypoints: false,
-          },
-          show: false, // Don't show the default instructions panel
-        }).addTo(mapInstance);
+        // Use a try-catch to handle the Leaflet Routing Machine fallback
+        try {
+          const control = L.Routing.control({
+            waypoints: [
+              startCoords,
+              endCoords
+            ],
+            router: L.Routing.osrmv1({
+              serviceUrl: 'https://router.project-osrm.org/route/v1'
+            }),
+            lineOptions: {
+              styles: [{ color: '#007bff', weight: 5 }],
+              addWaypoints: false,
+            },
+            show: false, // Don't show the default instructions panel
+          }).addTo(mapInstance);
 
-        // Get directions when route is found
-        control.on('routesfound', function(e: any) {
-          console.log("Route found:", e);
-          const routes = e.routes;
-          if (routes && routes.length > 0) {
-            const instructions = routes[0].instructions;
-            setDirections(instructions.map((step: any) => step.text));
-          }
-        });
+          // Get directions when route is found
+          control.on('routesfound', function(e: any) {
+            console.log("Route found:", e);
+            const routes = e.routes;
+            if (routes && routes.length > 0) {
+              const instructions = routes[0].instructions;
+              setDirections(instructions.map((step: any) => step.text));
+            }
+          });
 
-        setRoutingControl(control);
+          setRoutingControl(control);
+        } catch (fallbackError) {
+          console.error("Fallback routing error:", fallbackError);
+          toast.error("Unable to calculate route. Please try again later.");
+        }
       }
     } catch (error) {
       console.error("Error calculating route:", error);
@@ -247,7 +307,7 @@ const Map: React.FC = () => {
   };
 
   // Expose the calculateRoute function to the parent component
-  React.useEffect(() => {
+  useEffect(() => {
     if (window) {
       (window as any).calculateMapRoute = calculateRoute;
     }

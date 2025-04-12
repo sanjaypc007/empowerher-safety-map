@@ -24,22 +24,23 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
     setIsSearching(true);
 
     try {
-      // Call the exposed function from Map component
-      if (window && (window as any).calculateMapRoute) {
-        console.log("Calling calculateMapRoute with:", startLocation, endLocation);
-        (window as any).calculateMapRoute(startLocation, endLocation);
-      } else {
-        console.error("calculateMapRoute function not found on window object");
-        toast.error("Navigation service not available");
-      }
-      
-      // Call the provided onSearch callback as well
-      onSearch(startLocation, endLocation);
-      
-      // Reset searching state after a delay to simulate processing
+      // Call the exposed function from Map component with a small delay
+      // to ensure the map is fully initialized
       setTimeout(() => {
+        if (window && (window as any).calculateMapRoute) {
+          console.log("Calling calculateMapRoute with:", startLocation, endLocation);
+          (window as any).calculateMapRoute(startLocation, endLocation);
+        } else {
+          console.error("calculateMapRoute function not found on window object");
+          toast.error("Navigation service not available");
+        }
+        
+        // Call the provided onSearch callback as well
+        onSearch(startLocation, endLocation);
+        
+        // Reset searching state
         setIsSearching(false);
-      }, 1500);
+      }, 300);
     } catch (error) {
       console.error("Error calculating route:", error);
       toast.error("Error calculating route. Please try again.");
