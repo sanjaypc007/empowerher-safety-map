@@ -59,6 +59,11 @@ export const trackUserLocation = (map: L.Map): {
       const { latitude, longitude, accuracy } = position.coords;
       const latlng = L.latLng(latitude, longitude);
 
+      // Center the map on the user's location when first detected
+      if (!locationMarker) {
+        map.setView(latlng, 16);
+      }
+
       // Update or create the marker
       if (locationMarker) {
         locationMarker.setLatLng(latlng);
@@ -75,16 +80,17 @@ export const trackUserLocation = (map: L.Map): {
         locationMarker.bindPopup("Your current location").openPopup();
       }
 
-      // Update or create accuracy circle
+      // Update or create accuracy circle with reduced size and opacity
       if (accuracyCircle) {
         accuracyCircle.setLatLng(latlng);
-        accuracyCircle.setRadius(accuracy);
+        // Use a smaller radius by dividing the actual accuracy by 2 or using a fixed smaller value
+        accuracyCircle.setRadius(Math.min(accuracy / 2, 50)); // Reduced radius, max 50 meters
       } else {
         accuracyCircle = L.circle(latlng, {
-          radius: accuracy,
+          radius: Math.min(accuracy / 2, 50), // Reduced radius, max 50 meters
           color: '#4A90E2',
           fillColor: '#4A90E2',
-          fillOpacity: 0.15,
+          fillOpacity: 0.08, // Reduced opacity
           weight: 1
         }).addTo(map);
       }
@@ -99,15 +105,17 @@ export const trackUserLocation = (map: L.Map): {
 
   const startTracking = () => {
     if ("geolocation" in navigator) {
-      // Get initial position
+      // Get initial position with high accuracy
       navigator.geolocation.getCurrentPosition(updateLocation, handleError, {
-        enableHighAccuracy: true
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
       });
       
-      // Start watching position (will update automatically as user moves)
+      // Start watching position with more frequent updates
       watchId = navigator.geolocation.watchPosition(updateLocation, handleError, {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 5000,
         maximumAge: 0
       });
     }

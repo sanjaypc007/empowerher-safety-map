@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import L from 'leaflet';
 import axios from 'axios';
@@ -83,8 +84,8 @@ const Map: React.FC = () => {
     // Create map with a short delay to ensure DOM is ready
     const timer = setTimeout(() => {
       try {
-        // Create map - using default coordinates 
-        const map = L.map(mapRef.current).setView([11.0168, 76.9558], 12);
+        // Create map - starting with a default location, but we'll update to user's location
+        const map = L.map(mapRef.current).setView([11.0168, 76.9558], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -98,10 +99,21 @@ const Map: React.FC = () => {
             setTimeout(() => {
               drawSafetyZones(map);
               
-              // Start tracking user location once map is ready
+              // Start tracking user location once map is ready - automatically show current location
               const tracker = trackUserLocation(map);
               setLocationTracker(tracker);
               tracker.startTracking();
+              
+              // Store location data when available
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  setUserLocation([position.coords.latitude, position.coords.longitude]);
+                },
+                (error) => {
+                  console.error("Error getting location:", error);
+                  toast.error("Could not get your location. Please enable location access.");
+                }
+              );
             }, 200); // Add a short delay to ensure map is fully ready
           } catch (error) {
             console.error("Error drawing safety zones:", error);
