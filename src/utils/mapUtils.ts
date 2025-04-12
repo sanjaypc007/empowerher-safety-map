@@ -43,6 +43,101 @@ export const geocodeAddress = async (address: string): Promise<L.LatLng | null> 
   }
 };
 
+// Track user's current location and display it on the map
+export const trackUserLocation = (map: L.Map): { 
+  marker: L.Marker | null, 
+  circle: L.Circle | null,
+  startTracking: () => void,
+  stopTracking: () => void
+} => {
+  let locationMarker: L.Marker | null = null;
+  let accuracyCircle: L.Circle | null = null;
+  let watchId: number | null = null;
+  
+  const updateLocation = (position: GeolocationPosition) => {
+    try {
+      const { latitude, longitude, accuracy } = position.coords;
+      const latlng = L.latLng(latitude, longitude);
+
+      // Update or create the marker
+      if (locationMarker) {
+        locationMarker.setLatLng(latlng);
+      } else {
+        // Create custom icon for user location
+        const userIcon = L.divIcon({
+          className: 'user-location-marker',
+          html: '<div class="pulse"></div>',
+          iconSize: [15, 15],
+          iconAnchor: [7, 7]
+        });
+        
+        locationMarker = L.marker(latlng, { icon: userIcon }).addTo(map);
+        locationMarker.bindPopup("Your current location").openPopup();
+      }
+
+      // Update or create accuracy circle
+      if (accuracyCircle) {
+        accuracyCircle.setLatLng(latlng);
+        accuracyCircle.setRadius(accuracy);
+      } else {
+        accuracyCircle = L.circle(latlng, {
+          radius: accuracy,
+          color: '#4A90E2',
+          fillColor: '#4A90E2',
+          fillOpacity: 0.15,
+          weight: 1
+        }).addTo(map);
+      }
+    } catch (error) {
+      console.error("Error updating location marker:", error);
+    }
+  };
+
+  const handleError = (error: GeolocationPositionError) => {
+    console.error("Geolocation error:", error.message);
+  };
+
+  const startTracking = () => {
+    if ("geolocation" in navigator) {
+      // Get initial position
+      navigator.geolocation.getCurrentPosition(updateLocation, handleError, {
+        enableHighAccuracy: true
+      });
+      
+      // Start watching position (will update automatically as user moves)
+      watchId = navigator.geolocation.watchPosition(updateLocation, handleError, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    }
+  };
+
+  const stopTracking = () => {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    
+    if (locationMarker) {
+      map.removeLayer(locationMarker);
+      locationMarker = null;
+    }
+    
+    if (accuracyCircle) {
+      map.removeLayer(accuracyCircle);
+      accuracyCircle = null;
+    }
+  };
+
+  return {
+    marker: locationMarker,
+    circle: accuracyCircle,
+    startTracking,
+    stopTracking
+  };
+};
+
 // Calculate route between two points using Leaflet Routing Machine
 export const calculateRoute = (map: L.Map, startCoords: L.LatLng, endCoords: L.LatLng) => {
   try {

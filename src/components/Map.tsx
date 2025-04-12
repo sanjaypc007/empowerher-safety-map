@@ -9,7 +9,43 @@ import { toast } from "sonner";
 import DirectionsPanel from "./map/DirectionsPanel";
 import SafetyLegend from "./map/SafetyLegend";
 import RouteSearch from "./RouteSearch";
-import { initializeLeafletIcons, safetyColors, SafetyLevel } from "@/utils/mapUtils";
+import { 
+  initializeLeafletIcons, 
+  safetyColors, 
+  SafetyLevel, 
+  trackUserLocation 
+} from "@/utils/mapUtils";
+
+// Add CSS for the pulsing location marker
+const injectCustomCSS = () => {
+  const style = document.createElement('style');
+  style.textContent = `
+    .user-location-marker {
+      position: relative;
+    }
+    .pulse {
+      display: block;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #4285f4;
+      box-shadow: 0 0 0 rgba(66, 133, 244, 0.4);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.4);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(66, 133, 244, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0);
+      }
+    }
+  `;
+  document.head.appendChild(style);
+};
 
 // Add locate button component
 const LocateButton = ({ onClick }: { onClick: () => void }) => (
@@ -32,9 +68,13 @@ const Map: React.FC = () => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationComplete, setNavigationComplete] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [locationTracker, setLocationTracker] = useState<any>(null);
 
   // Initialize map with a delay to ensure DOM is fully ready
   useEffect(() => {
+    // Inject the custom CSS for the pulsing marker
+    injectCustomCSS();
+
     if (!mapRef.current || mapInstance) return;
 
     // Fix default icon issues
@@ -57,6 +97,11 @@ const Map: React.FC = () => {
           try {
             setTimeout(() => {
               drawSafetyZones(map);
+              
+              // Start tracking user location once map is ready
+              const tracker = trackUserLocation(map);
+              setLocationTracker(tracker);
+              tracker.startTracking();
             }, 200); // Add a short delay to ensure map is fully ready
           } catch (error) {
             console.error("Error drawing safety zones:", error);
@@ -72,6 +117,10 @@ const Map: React.FC = () => {
       clearTimeout(timer);
       if (mapInstance) {
         mapInstance.remove();
+      }
+      // Stop location tracking when component unmounts
+      if (locationTracker) {
+        locationTracker.stopTracking();
       }
     };
   }, []);
@@ -275,7 +324,7 @@ const Map: React.FC = () => {
     }
   };
 
-  // Handle locate user click
+  // Handle locate user click (center map on current location)
   const handleLocateUser = () => {
     if (!mapInstance) return;
     
@@ -285,12 +334,6 @@ const Map: React.FC = () => {
       mapInstance.on('locationfound', (e) => {
         const { lat, lng } = e.latlng;
         setUserLocation([lat, lng]);
-        
-        // Add marker at user's location
-        L.marker(e.latlng).addTo(mapInstance)
-          .bindPopup("Your location")
-          .openPopup();
-        
         toast.success("Location found");
       });
       
