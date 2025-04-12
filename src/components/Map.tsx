@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import L from 'leaflet';
 import axios from 'axios';
@@ -34,7 +33,7 @@ const Map: React.FC = () => {
   const [navigationComplete, setNavigationComplete] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
 
-  // Initialize map
+  // Initialize map with a delay to ensure DOM is fully ready
   useEffect(() => {
     if (!mapRef.current || mapInstance) return;
 
@@ -53,10 +52,12 @@ const Map: React.FC = () => {
         setMapInstance(map);
         setIsMapLoaded(true);
         
-        // Draw safety zones safely after map is fully initialized
+        // Ensure map is fully initialized before drawing safety zones
         map.whenReady(() => {
           try {
-            drawSafetyZones(map);
+            setTimeout(() => {
+              drawSafetyZones(map);
+            }, 200); // Add a short delay to ensure map is fully ready
           } catch (error) {
             console.error("Error drawing safety zones:", error);
           }
@@ -65,7 +66,7 @@ const Map: React.FC = () => {
         console.error("Error initializing map:", error);
         toast.error("Failed to initialize map. Please refresh the page.");
       }
-    }, 100);
+    }, 200); // Increased delay for more reliable initialization
 
     return () => {
       clearTimeout(timer);
@@ -75,28 +76,37 @@ const Map: React.FC = () => {
     };
   }, []);
 
-  // Draw safety zones on the map
+  // Draw safety zones on the map with additional error handling
   const drawSafetyZones = (map: L.Map) => {
-    // Example safety zones - these would come from your backend in a real implementation
-    const safetyZones = [
-      { center: [11.0168, 76.9558], radius: 500, level: SafetyLevel.HIGH_RISK },
-      { center: [11.0268, 76.9658], radius: 300, level: SafetyLevel.MEDIUM_RISK },
-      { center: [11.0368, 76.9758], radius: 400, level: SafetyLevel.SAFE },
-    ];
+    if (!map || !map.getCenter()) {
+      console.error("Map not properly initialized for drawing safety zones");
+      return;
+    }
+    
+    try {
+      // Example safety zones - these would come from your backend in a real implementation
+      const safetyZones = [
+        { center: [11.0168, 76.9558], radius: 500, level: SafetyLevel.HIGH_RISK },
+        { center: [11.0268, 76.9658], radius: 300, level: SafetyLevel.MEDIUM_RISK },
+        { center: [11.0368, 76.9758], radius: 400, level: SafetyLevel.SAFE },
+      ];
 
-    safetyZones.forEach(zone => {
-      try {
-        const color = safetyColors[zone.level];
-        L.circle(zone.center as L.LatLngExpression, {
-          radius: zone.radius,
-          color,
-          fillColor: color,
-          fillOpacity: 0.3
-        }).addTo(map);
-      } catch (error) {
-        console.error("Error adding safety zone:", error);
-      }
-    });
+      safetyZones.forEach(zone => {
+        try {
+          const color = safetyColors[zone.level];
+          L.circle(zone.center as L.LatLngExpression, {
+            radius: zone.radius,
+            color,
+            fillColor: color,
+            fillOpacity: 0.3
+          }).addTo(map);
+        } catch (error) {
+          console.error("Error adding safety zone:", error);
+        }
+      });
+    } catch (error) {
+      console.error("Error in drawSafetyZones:", error);
+    }
   };
 
   // Geocode addresses using OpenStreetMap Nominatim

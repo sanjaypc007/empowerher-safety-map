@@ -9,6 +9,9 @@ export const safetyColors = {
   [SafetyLevel.SAFE]: "#2ecc71", // Green for safe
 };
 
+// Re-export SafetyLevel from types to fix the import error
+export { SafetyLevel };
+
 // Initialize Leaflet icons to fix icon loading issues
 export const initializeLeafletIcons = () => {
   // Set default icon path for Leaflet
