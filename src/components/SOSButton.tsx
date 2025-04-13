@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Phone, UserCheck, AlertTriangle, MessageSquare } from "lucide-react";
+import { Phone, UserCheck, AlertTriangle, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
   const [sentSOS, setSentSOS] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
 
   // Fetch emergency contacts from Supabase
   useEffect(() => {
@@ -38,6 +39,28 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
     
     fetchContacts();
   }, [user.id]);
+
+  // Get current location
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    }
+  }, []);
 
   const handleSOSClick = () => {
     if (sentSOS) return;
@@ -66,10 +89,17 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
     window.location.href = `tel:${phoneNumber}`;
   };
   
-  const handleTextContact = (phoneNumber: string) => {
-    // Send a pre-filled SMS
-    const message = "I need help! Please check my location using EmpowerHer app.";
-    window.location.href = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+  const handleEmailContact = (email: string) => {
+    // Get current location for email body
+    const locationText = userLocation 
+      ? `My current location: https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`
+      : "Unable to share my precise location at the moment.";
+    
+    // Create email with pre-filled subject and body
+    const subject = "Need help!";
+    const body = `I need immediate assistance.\n\n${locationText}\n\nSent from EmpowerHer app.`;
+    
+    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
   
   return (
@@ -141,10 +171,10 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                         variant="outline" 
                         size="icon" 
                         className="h-8 w-8"
-                        onClick={() => handleTextContact(contact.phone)}
-                        aria-label={`Text ${contact.name}`}
+                        onClick={() => handleEmailContact(contact.email || user.email)}
+                        aria-label={`Email ${contact.name}`}
                       >
-                        <MessageSquare className="h-4 w-4 text-empowerher-primary" />
+                        <Mail className="h-4 w-4 text-empowerher-primary" />
                       </Button>
                     </div>
                   </div>

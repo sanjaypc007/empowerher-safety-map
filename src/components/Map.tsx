@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import L from 'leaflet';
 import axios from 'axios';
@@ -69,6 +70,8 @@ const Map: React.FC = () => {
   const [navigationComplete, setNavigationComplete] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [locationTracker, setLocationTracker] = useState<any>(null);
+  const [startMarker, setStartMarker] = useState<L.Marker | null>(null);
+  const [endMarker, setEndMarker] = useState<L.Marker | null>(null);
 
   // Initialize map with a delay to ensure DOM is fully ready
   useEffect(() => {
@@ -214,6 +217,38 @@ const Map: React.FC = () => {
     });
   };
 
+  // Clear previous route elements
+  const clearPreviousRoute = () => {
+    if (!mapInstance) return;
+    
+    // Remove previous route layer
+    if (routeLayer) {
+      mapInstance.removeLayer(routeLayer);
+      setRouteLayer(null);
+    }
+    
+    // Remove previous routing control
+    if (routingControl) {
+      mapInstance.removeControl(routingControl);
+      setRoutingControl(null);
+    }
+    
+    // Remove previous markers
+    if (startMarker) {
+      mapInstance.removeLayer(startMarker);
+      setStartMarker(null);
+    }
+    
+    if (endMarker) {
+      mapInstance.removeLayer(endMarker);
+      setEndMarker(null);
+    }
+    
+    // Clear directions
+    setDirections([]);
+    setShowDirections(false);
+  };
+
   // Calculate route using OSRM API directly
   const calculateRoute = async (start: string, end: string) => {
     if (!mapInstance) {
@@ -224,28 +259,39 @@ const Map: React.FC = () => {
     console.log("Calculating route from", start, "to", end);
     
     try {
-      // Remove previous routes if they exist
-      if (routingControl) {
-        mapInstance.removeControl(routingControl);
-        setRoutingControl(null);
-      }
-      
-      if (routeLayer) {
-        mapInstance.removeLayer(routeLayer);
-        setRouteLayer(null);
-      }
+      // Clear previous route
+      clearPreviousRoute();
       
       // Get start coordinates (use current location if start is empty)
       let startCoords: L.LatLng;
-      if (start === "") {
+      if (!start.trim()) {
         if (userLocation) {
           startCoords = L.latLng(userLocation[0], userLocation[1]);
+        } else if (locationTracker) {
+          // Try to get current position from the tracker
+          try {
+            startCoords = await locationTracker.getCurrentPosition();
+          } catch (error) {
+            toast.error("Could not determine your current location. Please enable location access.");
+            return;
+          }
         } else {
-          // Get current location if not already available
+          // Get current location as a last resort
           startCoords = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(
-              (position) => resolve(L.latLng(position.coords.latitude, position.coords.longitude)),
-              (error) => reject("Geolocation failed. Please enable location access.")
+              (position) => {
+                const coords = L.latLng(position.coords.latitude, position.coords.longitude);
+                setUserLocation([position.coords.latitude, position.coords.longitude]);
+                resolve(coords);
+              },
+              (error) => {
+                reject(new Error("Could not determine your current location. Please enable location access."));
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+              }
             );
           });
         }
@@ -272,6 +318,10 @@ const Map: React.FC = () => {
       setIsNavigating(true);
       setNavigationComplete(false);
       
+      // Add markers for start and end
+      setStartMarker(L.marker(startCoords).addTo(mapInstance).bindPopup("Start"));
+      setEndMarker(L.marker(endCoords).addTo(mapInstance).bindPopup("Destination"));
+      
       // Show directions panel
       setShowDirections(true);
       
@@ -294,10 +344,6 @@ const Map: React.FC = () => {
         }).addTo(mapInstance);
         
         setRouteLayer(polyline);
-        
-        // Add markers for start and end
-        L.marker(startCoords).addTo(mapInstance).bindPopup("Start");
-        L.marker(endCoords).addTo(mapInstance).bindPopup("Destination");
         
         // Fit map to route bounds
         mapInstance.fitBounds(polyline.getBounds(), { padding: [50, 50] });
@@ -416,7 +462,7 @@ const Map: React.FC = () => {
         delete (window as any).calculateMapRoute;
       }
     };
-  }, [mapInstance]);
+  }, [mapInstance, userLocation, locationTracker]);
 
   return (
     <div className="relative w-full h-[calc(100vh-120px)] mt-16">

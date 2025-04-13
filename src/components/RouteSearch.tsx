@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin, Navigation } from "lucide-react";
+import { Search, MapPin, Navigation, Locate } from "lucide-react";
 import { toast } from "sonner";
 
 interface RouteSearchProps {
@@ -53,7 +53,7 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
       <CardContent className="p-4">
         <div className="space-y-4">
           <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Locate className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
               id="start"
               placeholder="Starting point (leave empty for current location)"

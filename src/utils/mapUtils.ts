@@ -1,4 +1,3 @@
-
 import L from 'leaflet';
 import { SafetyLevel } from "@/types";
 
@@ -48,16 +47,19 @@ export const trackUserLocation = (map: L.Map): {
   marker: L.Marker | null, 
   circle: L.Circle | null,
   startTracking: () => void,
-  stopTracking: () => void
+  stopTracking: () => void,
+  getCurrentPosition: () => Promise<L.LatLng>
 } => {
   let locationMarker: L.Marker | null = null;
   let accuracyCircle: L.Circle | null = null;
   let watchId: number | null = null;
+  let currentPosition: L.LatLng | null = null;
   
   const updateLocation = (position: GeolocationPosition) => {
     try {
       const { latitude, longitude, accuracy } = position.coords;
       const latlng = L.latLng(latitude, longitude);
+      currentPosition = latlng;
       
       // Clear existing markers/circles to prevent duplicates
       if (locationMarker) map.removeLayer(locationMarker);
@@ -77,15 +79,12 @@ export const trackUserLocation = (map: L.Map): {
 
       // Use a much smaller, less obtrusive accuracy circle
       accuracyCircle = L.circle(latlng, {
-        radius: Math.min(accuracy / 4, 30), // Even smaller radius, max 30 meters
+        radius: Math.min(accuracy / 10, 15), // Even smaller radius, max 15 meters
         color: '#4A90E2',
         fillColor: '#4A90E2',
-        fillOpacity: 0.05, // Further reduced opacity
+        fillOpacity: 0.03, // Further reduced opacity
         weight: 1
       }).addTo(map);
-      
-      // Center the map on the user's location when first detected or on significant position changes
-      map.setView(latlng, 16);
       
       console.log("Location updated:", latitude, longitude);
     } catch (error) {
@@ -110,7 +109,7 @@ export const trackUserLocation = (map: L.Map): {
         handleError, 
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 5000,
           maximumAge: 0 // Force fresh location, don't use cached
         }
       );
@@ -144,12 +143,42 @@ export const trackUserLocation = (map: L.Map): {
       accuracyCircle = null;
     }
   };
+  
+  // New method to get current position as a promise
+  const getCurrentPosition = (): Promise<L.LatLng> => {
+    return new Promise((resolve, reject) => {
+      if (currentPosition) {
+        // If we already have a position, return it immediately
+        resolve(currentPosition);
+      } else {
+        // Otherwise, get a fresh position
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const latlng = L.latLng(latitude, longitude);
+            currentPosition = latlng;
+            resolve(latlng);
+          },
+          (error) => {
+            console.error("Error getting current position:", error);
+            reject(error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        );
+      }
+    });
+  };
 
   return {
     marker: locationMarker,
     circle: accuracyCircle,
     startTracking,
-    stopTracking
+    stopTracking,
+    getCurrentPosition
   };
 };
 
