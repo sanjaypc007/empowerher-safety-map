@@ -1,3 +1,4 @@
+
 import L from 'leaflet';
 import { SafetyLevel } from "@/types";
 
@@ -79,14 +80,19 @@ export const trackUserLocation = (map: L.Map): {
 
       // Use a much smaller, less obtrusive accuracy circle
       accuracyCircle = L.circle(latlng, {
-        radius: Math.min(accuracy / 10, 15), // Even smaller radius, max 15 meters
+        radius: Math.min(accuracy / 20, 10), // Even smaller radius, max 10 meters
         color: '#4A90E2',
         fillColor: '#4A90E2',
-        fillOpacity: 0.03, // Further reduced opacity
+        fillOpacity: 0.02, // Further reduced opacity
         weight: 1
       }).addTo(map);
       
       console.log("Location updated:", latitude, longitude);
+      
+      // Center map on user's location only on initial update or if very different
+      if (!map.getBounds().contains(latlng)) {
+        map.setView(latlng, 16);
+      }
     } catch (error) {
       console.error("Error updating location marker:", error);
     }
@@ -94,6 +100,52 @@ export const trackUserLocation = (map: L.Map): {
 
   const handleError = (error: GeolocationPositionError) => {
     console.error("Geolocation error:", error.message);
+    
+    // Show a toast message to the user about the error
+    if (window && (window as any).showLocationError) {
+      (window as any).showLocationError(error.message);
+    }
+    
+    // Try to fall back to IP-based geolocation if browser geolocation fails
+    fallbackToIPGeolocation();
+  };
+  
+  // Fallback to IP-based geolocation when browser geolocation fails
+  const fallbackToIPGeolocation = async () => {
+    try {
+      // Use ipinfo.io to get location based on IP
+      const response = await fetch('https://ipinfo.io/json?token=2c8e3d8c50f4d2');
+      const data = await response.json();
+      
+      if (data && data.loc) {
+        const [lat, lng] = data.loc.split(',').map(Number);
+        const latlng = L.latLng(lat, lng);
+        
+        // Update the current position
+        currentPosition = latlng;
+        
+        // Create a marker for this location
+        if (locationMarker) map.removeLayer(locationMarker);
+        if (accuracyCircle) map.removeLayer(accuracyCircle);
+        
+        const userIcon = L.divIcon({
+          className: 'user-location-marker',
+          html: '<div class="pulse"></div>',
+          iconSize: [15, 15],
+          iconAnchor: [7, 7]
+        });
+        
+        locationMarker = L.marker(latlng, { icon: userIcon }).addTo(map);
+        locationMarker.bindPopup("Your approximate location (based on IP)").openPopup();
+        
+        // Center map on this location
+        map.setView(latlng, 14); // Slightly less zoomed in for IP-based location
+        
+        console.log("Fallback location set from IP:", lat, lng);
+      }
+    } catch (fallbackError) {
+      console.error("Error in IP geolocation fallback:", fallbackError);
+    }
   };
 
   const startTracking = () => {
@@ -109,7 +161,7 @@ export const trackUserLocation = (map: L.Map): {
         handleError, 
         {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0 // Force fresh location, don't use cached
         }
       );
@@ -120,10 +172,13 @@ export const trackUserLocation = (map: L.Map): {
         handleError, 
         {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0 // Never use cached positions
         }
       );
+    } else {
+      // Browser doesn't support geolocation API
+      fallbackToIPGeolocation();
     }
   };
 
@@ -161,7 +216,22 @@ export const trackUserLocation = (map: L.Map): {
           },
           (error) => {
             console.error("Error getting current position:", error);
-            reject(error);
+            // Try IP-based geolocation as a fallback
+            fetch('https://ipinfo.io/json?token=2c8e3d8c50f4d2')
+              .then(response => response.json())
+              .then(data => {
+                if (data && data.loc) {
+                  const [lat, lng] = data.loc.split(',').map(Number);
+                  const latlng = L.latLng(lat, lng);
+                  currentPosition = latlng;
+                  resolve(latlng);
+                } else {
+                  reject(new Error("Could not determine location"));
+                }
+              })
+              .catch(err => {
+                reject(err);
+              });
           },
           {
             enableHighAccuracy: true,

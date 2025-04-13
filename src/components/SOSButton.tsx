@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Phone, UserCheck, AlertTriangle, Mail } from "lucide-react";
+import { Phone, UserCheck, AlertTriangle, Mail, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User, EmergencyContact } from "@/types";
@@ -17,6 +20,13 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [showAddContactDialog, setShowAddContactDialog] = useState(false);
+  const [newContact, setNewContact] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    relation: ""
+  });
 
   // Fetch emergency contacts from Supabase
   useEffect(() => {
@@ -101,6 +111,52 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
     
     window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
+
+  const handleAddContact = async () => {
+    if (!newContact.name || !newContact.phone) {
+      toast.error("Name and phone number are required");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('emergency_contacts')
+        .insert({
+          user_id: user.id,
+          name: newContact.name,
+          phone: newContact.phone,
+          email: newContact.email || null,
+          relation: newContact.relation || null
+        })
+        .select();
+        
+      if (error) throw error;
+      
+      toast.success("Emergency contact added successfully");
+      
+      // Reset form and close dialog
+      setNewContact({ name: "", phone: "", email: "", relation: "" });
+      setShowAddContactDialog(false);
+      
+      // Update the contacts list with the new contact
+      if (data && data.length > 0) {
+        setEmergencyContacts([...emergencyContacts, data[0]]);
+      } else {
+        // Refresh the entire list if we didn't get the newly created contact back
+        const { data: refreshedData } = await supabase
+          .from('emergency_contacts')
+          .select('*')
+          .eq('user_id', user.id);
+          
+        if (refreshedData) {
+          setEmergencyContacts(refreshedData);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error adding emergency contact:", error);
+      toast.error(error.message || "Failed to add emergency contact");
+    }
+  };
   
   return (
     <div className="flex flex-col items-center justify-center h-full px-4 pt-16 pb-4">
@@ -143,7 +199,18 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
           </div>
           
           <div className="border-t pt-6">
-            <h3 className="font-medium text-center mb-4">Your Emergency Contacts</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-medium">Your Emergency Contacts</h3>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowAddContactDialog(true)}
+                className="flex items-center text-xs"
+              >
+                <PlusCircle className="h-3 w-3 mr-1" />
+                Add Contact
+              </Button>
+            </div>
             
             {isLoading ? (
               <div className="flex justify-center py-4">
@@ -185,7 +252,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                 <p className="text-gray-500 mb-4">No emergency contacts added yet</p>
                 <Button 
                   variant="outline" 
-                  onClick={() => window.location.hash = "/add-contact"}
+                  onClick={() => setShowAddContactDialog(true)}
                   className="bg-empowerher-primary text-white hover:bg-empowerher-dark"
                 >
                   Add Emergency Contact
@@ -195,6 +262,69 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Contact Dialog */}
+      <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Emergency Contact</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="contact-name">Name</Label>
+              <Input 
+                id="contact-name" 
+                value={newContact.name}
+                onChange={(e) => setNewContact({...newContact, name: e.target.value})}
+                placeholder="Contact name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-phone">Phone Number</Label>
+              <Input 
+                id="contact-phone" 
+                value={newContact.phone}
+                onChange={(e) => setNewContact({...newContact, phone: e.target.value})}
+                placeholder="Phone number"
+                type="tel"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-email">Email (Optional)</Label>
+              <Input 
+                id="contact-email" 
+                value={newContact.email}
+                onChange={(e) => setNewContact({...newContact, email: e.target.value})}
+                placeholder="Email address"
+                type="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-relation">Relationship (Optional)</Label>
+              <Input 
+                id="contact-relation" 
+                value={newContact.relation}
+                onChange={(e) => setNewContact({...newContact, relation: e.target.value})}
+                placeholder="E.g. Parent, Friend, Sibling"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAddContactDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddContact}
+              className="bg-empowerher-primary hover:bg-empowerher-dark"
+            >
+              Save Contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import L from 'leaflet';
 import axios from 'axios';
@@ -318,9 +317,24 @@ const Map: React.FC = () => {
       setIsNavigating(true);
       setNavigationComplete(false);
       
-      // Add markers for start and end
-      setStartMarker(L.marker(startCoords).addTo(mapInstance).bindPopup("Start"));
-      setEndMarker(L.marker(endCoords).addTo(mapInstance).bindPopup("Destination"));
+      // Create custom icons for start and end markers
+      const startIcon = L.divIcon({
+        className: 'custom-marker',
+        html: '<div style="background-color: #1E90FF; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+      
+      const endIcon = L.divIcon({
+        className: 'custom-marker',
+        html: '<div style="background-color: #FF4136; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+      
+      // Add markers for start and end with custom icons
+      setStartMarker(L.marker(startCoords, {icon: startIcon}).addTo(mapInstance).bindPopup("Start"));
+      setEndMarker(L.marker(endCoords, {icon: endIcon}).addTo(mapInstance).bindPopup("Destination"));
       
       // Show directions panel
       setShowDirections(true);

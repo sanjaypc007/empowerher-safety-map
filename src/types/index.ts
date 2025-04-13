@@ -11,6 +11,7 @@ export interface EmergencyContact {
   name: string;
   phone: string;
   relation: string;
+  email?: string;  // Add email property which is optional
 }
 
 export interface SafetyReport {
