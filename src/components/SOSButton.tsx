@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Phone, UserCheck, AlertTriangle, Mail, PlusCircle } from "lucide-react";
@@ -20,6 +19,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [locationName, setLocationName] = useState<string | null>(null);
   const [showAddContactDialog, setShowAddContactDialog] = useState(false);
   const [newContact, setNewContact] = useState({
     name: "",
@@ -54,11 +54,25 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
+        async (position) => {
+          const coords = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setUserLocation(coords);
+          
+          // Try to get a human-readable location name
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}`
+            );
+            const data = await response.json();
+            if (data && data.display_name) {
+              setLocationName(data.display_name);
+            }
+          } catch (error) {
+            console.error("Error getting location name:", error);
+          }
         },
         (error) => {
           console.error("Error getting location:", error);
@@ -72,6 +86,34 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
     }
   }, []);
 
+  const sendEmergencyEmail = async (contactEmail: string, contactName: string) => {
+    try {
+      // Create location link for Google Maps if we have coordinates
+      const locationLink = userLocation 
+        ? `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}` 
+        : undefined;
+      
+      const response = await supabase.functions.invoke('send-sos-email', {
+        body: {
+          userName: user.name || 'User',
+          contactName,
+          contactEmail,
+          locationLink,
+          locationName
+        }
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to send SOS email');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error sending SOS email:', error);
+      return false;
+    }
+  };
+
   const handleSOSClick = () => {
     if (sentSOS) return;
     
@@ -79,59 +121,51 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
     
     // Simulate SOS sending and also send emails
     setTimeout(async () => {
-      setIsSending(false);
-      setSentSOS(true);
+      let emailSuccessCount = 0;
+      let emailFailCount = 0;
       
-      // If we have contacts and location, send emails
-      if (emergencyContacts.length > 0 && userLocation) {
-        try {
-          // For each contact, send an email
-          for (const contact of emergencyContacts) {
-            await sendSOSEmail(contact.email, contact.name);
+      // If we have contacts, send emails
+      if (emergencyContacts.length > 0) {
+        const emailPromises = emergencyContacts.map(async (contact) => {
+          const success = await sendEmergencyEmail(contact.email, contact.name);
+          if (success) {
+            emailSuccessCount++;
+          } else {
+            emailFailCount++;
           }
-          
-          toast.success("SOS sent successfully to your emergency contacts", {
-            description: "They have been notified of your location via email and text",
+        });
+        
+        // Wait for all emails to be sent
+        await Promise.all(emailPromises);
+        
+        if (emailSuccessCount > 0) {
+          toast.success(`SOS emails sent to ${emailSuccessCount} contact${emailSuccessCount > 1 ? 's' : ''}`, {
+            description: "They have been notified of your situation",
             duration: 5000,
           });
-        } catch (error) {
-          console.error("Error sending SOS emails:", error);
-          toast.error("Failed to send some notifications, but SOS is active");
+        }
+        
+        if (emailFailCount > 0) {
+          toast.error(`Failed to send ${emailFailCount} email${emailFailCount > 1 ? 's' : ''}`, {
+            description: "Please try calling your contacts directly",
+            duration: 5000,
+          });
         }
       } else {
-        toast.success("SOS activated", {
-          description: "Your emergency status is now active",
+        toast.info("No emergency contacts to notify", {
+          description: "Please add contacts for SOS notifications",
           duration: 5000,
         });
       }
+      
+      setIsSending(false);
+      setSentSOS(true);
       
       // Reset after 30 seconds
       setTimeout(() => {
         setSentSOS(false);
       }, 30000);
     }, 2000);
-  };
-
-  const sendSOSEmail = async (email: string, contactName: string) => {
-    // In a real app, this would call a backend API to send the email
-    // For now, we'll just open the email client with pre-filled details
-    if (!userLocation) {
-      toast.error("Unable to get your location for the SOS message");
-      return;
-    }
-    
-    const emailSubject = "Need help!";
-    const locationLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
-    const emailBody = `I need immediate assistance!\n\nMy current location: ${locationLink}\n\nPlease contact me or emergency services right away.\n\nSent via EmpowerHer safety app.`;
-    
-    const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-    
-    // In a mobile app, this would use a native API to send the email
-    // For the web app, we'll open the user's email client
-    window.open(mailtoUrl, '_blank');
-    
-    console.log(`SOS email sent to ${contactName} at ${email}`);
-    return true;
   };
 
   const handleCallContact = (phoneNumber: string) => {
@@ -141,7 +175,10 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
   
   const handleEmailContact = (email: string, contactName: string) => {
     // Send SOS email
-    sendSOSEmail(email, contactName);
+    sendEmergencyEmail(email, contactName);
+    toast.success(`SOS email sent to ${contactName}`, {
+      description: "Email has been sent with your location information",
+    });
   };
 
   const handleAddContact = async () => {
