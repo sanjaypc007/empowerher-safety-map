@@ -83,8 +83,8 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
       return;
     }
     
-    if (!emergencyName || !emergencyPhone) {
-      toast.error("Name and phone number are required");
+    if (!emergencyName || !emergencyPhone || !emergencyEmail) {
+      toast.error("Name, phone number, and email are required");
       return;
     }
     
@@ -219,13 +219,14 @@ const RouteSearch: React.FC<RouteSearchProps> = ({ onSearch }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="emergency-email" className="text-sm font-medium">Email (Optional)</Label>
+              <Label htmlFor="emergency-email" className="text-sm font-medium">Email Address</Label>
               <Input
                 id="emergency-email"
                 value={emergencyEmail}
                 onChange={(e) => setEmergencyEmail(e.target.value)}
                 placeholder="Email address"
                 type="email"
+                required
               />
             </div>
             <div className="space-y-2">

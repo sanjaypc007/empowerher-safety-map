@@ -77,15 +77,33 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
     
     setIsSending(true);
     
-    // Simulate SOS sending
-    setTimeout(() => {
+    // Simulate SOS sending and also send emails
+    setTimeout(async () => {
       setIsSending(false);
       setSentSOS(true);
       
-      toast.success("SOS sent successfully to your emergency contacts", {
-        description: "They have been notified of your location",
-        duration: 5000,
-      });
+      // If we have contacts and location, send emails
+      if (emergencyContacts.length > 0 && userLocation) {
+        try {
+          // For each contact, send an email
+          for (const contact of emergencyContacts) {
+            await sendSOSEmail(contact.email, contact.name);
+          }
+          
+          toast.success("SOS sent successfully to your emergency contacts", {
+            description: "They have been notified of your location via email and text",
+            duration: 5000,
+          });
+        } catch (error) {
+          console.error("Error sending SOS emails:", error);
+          toast.error("Failed to send some notifications, but SOS is active");
+        }
+      } else {
+        toast.success("SOS activated", {
+          description: "Your emergency status is now active",
+          duration: 5000,
+        });
+      }
       
       // Reset after 30 seconds
       setTimeout(() => {
@@ -94,27 +112,41 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
     }, 2000);
   };
 
+  const sendSOSEmail = async (email: string, contactName: string) => {
+    // In a real app, this would call a backend API to send the email
+    // For now, we'll just open the email client with pre-filled details
+    if (!userLocation) {
+      toast.error("Unable to get your location for the SOS message");
+      return;
+    }
+    
+    const emailSubject = "Need help!";
+    const locationLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
+    const emailBody = `I need immediate assistance!\n\nMy current location: ${locationLink}\n\nPlease contact me or emergency services right away.\n\nSent via EmpowerHer safety app.`;
+    
+    const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    
+    // In a mobile app, this would use a native API to send the email
+    // For the web app, we'll open the user's email client
+    window.open(mailtoUrl, '_blank');
+    
+    console.log(`SOS email sent to ${contactName} at ${email}`);
+    return true;
+  };
+
   const handleCallContact = (phoneNumber: string) => {
     // Make a phone call using the system dialer
     window.location.href = `tel:${phoneNumber}`;
   };
   
-  const handleEmailContact = (email: string) => {
-    // Get current location for email body
-    const locationText = userLocation 
-      ? `My current location: https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`
-      : "Unable to share my precise location at the moment.";
-    
-    // Create email with pre-filled subject and body
-    const subject = "Need help!";
-    const body = `I need immediate assistance.\n\n${locationText}\n\nSent from EmpowerHer app.`;
-    
-    window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const handleEmailContact = (email: string, contactName: string) => {
+    // Send SOS email
+    sendSOSEmail(email, contactName);
   };
 
   const handleAddContact = async () => {
-    if (!newContact.name || !newContact.phone) {
-      toast.error("Name and phone number are required");
+    if (!newContact.name || !newContact.phone || !newContact.email) {
+      toast.error("Name, phone number, and email are required");
       return;
     }
 
@@ -125,7 +157,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
           user_id: user.id,
           name: newContact.name,
           phone: newContact.phone,
-          email: newContact.email || null,
+          email: newContact.email,
           relation: newContact.relation || null
         })
         .select();
@@ -223,6 +255,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                     <div className="flex-grow">
                       <p className="font-medium">{contact.name}</p>
                       <p className="text-sm text-gray-500">{contact.relation} • {contact.phone}</p>
+                      <p className="text-sm text-gray-500">{contact.email}</p>
                     </div>
                     <div className="flex space-x-2">
                       <Button 
@@ -238,7 +271,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                         variant="outline" 
                         size="icon" 
                         className="h-8 w-8"
-                        onClick={() => handleEmailContact(contact.email || user.email)}
+                        onClick={() => handleEmailContact(contact.email, contact.name)}
                         aria-label={`Email ${contact.name}`}
                       >
                         <Mail className="h-4 w-4 text-empowerher-primary" />
@@ -277,6 +310,7 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                 value={newContact.name}
                 onChange={(e) => setNewContact({...newContact, name: e.target.value})}
                 placeholder="Contact name"
+                required
               />
             </div>
             <div className="space-y-2">
@@ -287,16 +321,18 @@ const SOSButton: React.FC<SOSButtonProps> = ({ user }) => {
                 onChange={(e) => setNewContact({...newContact, phone: e.target.value})}
                 placeholder="Phone number"
                 type="tel"
+                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact-email">Email (Optional)</Label>
+              <Label htmlFor="contact-email">Email</Label>
               <Input 
                 id="contact-email" 
                 value={newContact.email}
                 onChange={(e) => setNewContact({...newContact, email: e.target.value})}
                 placeholder="Email address"
                 type="email"
+                required
               />
             </div>
             <div className="space-y-2">

@@ -13,6 +13,7 @@ interface EmergencyContact {
   user_id: string;
   name: string;
   phone: string;
+  email: string; // Now required
   relation?: string;
 }
 
@@ -24,14 +25,15 @@ interface EmergencyContactFormProps {
 const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSubmit }) => {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [relation, setRelation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !phone) {
-      toast.error("Please fill in all fields");
+    if (!name || !phone || !email) {
+      toast.error("Please fill in all required fields");
       return;
     }
     
@@ -43,6 +45,7 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
         user_id: user.id,
         name,
         phone,
+        email,
         relation: relation || null
       });
       
@@ -53,6 +56,7 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
           user_id: user.id,
           name,
           phone,
+          email,
           relation: relation || null
         });
         
@@ -66,6 +70,7 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
       // Clear fields after successful submission
       setName("");
       setPhone("");
+      setEmail("");
       setRelation("");
     } catch (err: any) {
       console.error("Error saving emergency contact:", err);
@@ -127,6 +132,18 @@ const EmergencyContactForm: React.FC<EmergencyContactFormProps> = ({ user, onSub
                 </Button>
               </div>
             )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address</Label>
+            <Input 
+              id="email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              placeholder="Enter email address"
+              type="email"
+              required
+            />
           </div>
           
           <div className="space-y-2">
